@@ -494,8 +494,13 @@ void Chess::setStateString(const std::string& fen) {
 		}
 	}}
 
-	// extract the game state part of FEN
 	i++;
+	if (i >= fen.size()) {
+		_state.emplace(fen, 0, 0b1111, 255, 0, 0);
+		return;
+	}
+
+	// extract the game state part of FEN
 	bool isBlack = (fen[i] == 'b');
 	i += 2;
 
