@@ -41,6 +41,7 @@ const std::map<char, ChessPiece> pieceFromSymbol = {
 	{'k', ChessPiece::King}
 };
 
+const int spriteSize = 64;
 // make a chess piece for the player
 ChessBit* Chess::PieceForPlayer(const int playerNumber, ChessPiece piece) {
 	const char* pieces[] = { "pawn.png", "knight.png", "bishop.png", "rook.png", "queen.png", "king.png" };
@@ -57,7 +58,7 @@ ChessBit* Chess::PieceForPlayer(const int playerNumber, ChessPiece piece) {
 		in the context of this code to simply use the 4th bit to denote the color of a piece.
 		*/
 	bit->setGameTag(playerNumber << 3 | piece);
-	bit->setSize(pieceSize, pieceSize);
+	bit->setSize(spriteSize, spriteSize);
 
 	return bit;
 }
@@ -101,10 +102,45 @@ void Chess::setUpBoard() {
 	moveGenerator();
 }
 
+bool inCheck = false;
+bool pinned = false;
+bool doublePin = false;
+bool pinInPosition = false;
+uint8_t checkRayBitmask = 0;
+uint8_t pinRayBitmask = 0;
 const int dir[8] = {8, 1, -8, -1, 9, -7, -9, 7};
+
+inline void ReInitGen() {
+	inCheck = false;
+	pinned = false;
+	doublePin = false;
+	pinInPosition = false;
+	checkRayBitmask = 0;
+	pinRayBitmask = 0;
+}
+
+inline void CalculateAttackData() {
+
+}
+
 void Chess::moveGenerator() {
 	// this isn't optimised the best; in the future we'll want to use bitboards instead.
 	_moves.clear();
+
+	// reset variables.
+	ReInitGen();
+	CalculateAttackData();
+
+	// Re-determin pinned & other states.
+
+	// ================================
+	// ================================
+
+	uint8_t friendlyKingSquare = _state.top().getEnemyKingSquare();
+	if (doublePin) {
+		generateKingMoves(friendlyKingSquare, _grid[friendlyKingSquare], !_state.top().isBlackTurn());
+	}
+
 	for (ChessSquare& square : _grid) {
 		// we only do half of the moves b/c we'll have to recalculate all moves next turn anyway
 		ChessBit* subject = square.bit();
@@ -112,8 +148,16 @@ void Chess::moveGenerator() {
 		const uint8_t	piece = subject->gameTag() & 7;
 		const bool 		black = subject->gameTag() & 8;
 		const uint8_t	index = square.getIndex();
+
 		_moves[index].reserve(31);
 		int flag = 0;
+		bool pinned = isPinned(index);
+
+		// if there is check and piece is pinned, then no piece can move.
+		if (inCheck && pinned) {
+			return;
+		}
+
 		// average number of moves per turn
 		// https://chess.stackexchange.com/questions/23135/what-is-the-average-number-of-legal-moves-per-turn#24325
 
@@ -133,22 +177,37 @@ void Chess::moveGenerator() {
 				// rotate around the piece and discover new spots the sliding pieces can move to.
 				int start = piece == ChessPiece::Bishop ? 4 : 0;
 				int end   = piece == ChessPiece::Rook   ? 4 : 8;
-				for (int i = start; i < end; i++) {
-					for (int k = 0; k < _dist[index][i]; k++) {
-						uint8_t targ = index + dir[i] * (k + 1);
+				for (int aisle = start; aisle < end; aisle++) {
+					// if pinned, but not in check, you can move along
+					if (pinned && !isMovingAlongRay(aisle, friendlyKingSquare, index)) {
+						continue;
+					}
+
+					for (int k = 0; k < _dist[index][aisle]; k++) {
+						uint8_t targ = index + dir[aisle] * (k + 1);
 						ChessBit* bit = _grid[targ].bit();
 
-						if (bit) {
-							if (bit->isAlly(square.bit())) {
-								break;
-							} else {
-								// TODO: calculate flags properly to update
-								_moves[index].emplace_back(index, targ, Move::FlagCodes::Capture);
-								break;
-							}
+						// blocked
+						if (square.bit()->isAlly(bit)) {
+							break;
+						} else {
+							flag |= Move::FlagCodes::Capture;
 						}
 
 						_moves[index].emplace_back(index, targ, flag);
+
+						/*
+						bool movePreventsCheck = SquareIsInCheckRay (targ);
+						if (movePreventsCheck || !inCheck) {
+							if (genQuiets || flag & 1) {
+								moves.Add (new Move (startSquare, targ));
+							}
+						}
+						// If square not empty, can't move any further in this direction
+						// Also, if this move blocked a check, further moves won't block the check
+						if (isCapture || movePreventsCheck) {
+							break;
+						}*/
 					}
 				}
 				break; }
@@ -224,41 +283,57 @@ void Chess::moveGenerator() {
 				}
 				break; }
 			case ChessPiece::King: {
-				// TODO: Castling
-				for (int i = 0; i < 8; i++) {
-					if (_dist[index][i] < 1) continue;
-					int targ = index + dir[i];
-					ChessBit* bit = _grid[targ].bit();
-
-					if (bit) {
-						if (bit->isAlly(square.bit())) {
-							continue;
-						} else {
-							_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling | Move::FlagCodes::Capture);
-							continue;
-						}
-					}
-					_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling);
-				}
-
-				uint8_t rights = _state.top().getCastlingRights();
-				// Queenside
-				if ((rights & black ? 0b0100 : 0b0001) != 0) {
-					if (!_grid[index - 1].bit() && !_grid[index - 2].bit() && !_grid[index - 3].bit()) {
-						_moves[index].emplace_back(index, index - 2, Move::FlagCodes::QCastle);
-					}
-				}
-				// Kingside
-				if ((rights & black ? 0b1000 : 0b0010) != 0) {
-					if (!_grid[index + 1].bit() && !_grid[index + 2].bit()) {
-						_moves[index].emplace_back(index, index + 2, Move::FlagCodes::KCastle);
-					}
-				}
+				generateKingMoves(index, square, black);
 				break; }
 			default:
 				break;
 		}
 	}
+}
+
+void Chess::generateKingMoves(int index, ChessSquare& square, bool black) {
+	for (int i = 0; i < 8; i++) {
+		if (_dist[index][i] < 1) continue;
+		int targ = index + dir[i];
+		ChessBit* bit = _grid[targ].bit();
+
+		if (bit) {
+			if (bit->isAlly(square.bit())) {
+				continue;
+			} else {
+				_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling | Move::FlagCodes::Capture);
+				continue;
+			}
+		}
+		_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling);
+	}
+
+	uint8_t rights = _state.top().getCastlingRights();
+	// Queenside
+	if ((rights & black ? 0b0100 : 0b0001) != 0) {
+		if (!_grid[index - 1].bit() && !_grid[index - 2].bit() && !_grid[index - 3].bit()) {
+			_moves[index].emplace_back(index, index - 2, Move::FlagCodes::QCastle);
+		}
+	}
+	// Kingside
+	if ((rights & black ? 0b1000 : 0b0010) != 0) {
+		if (!_grid[index + 1].bit() && !_grid[index + 2].bit()) {
+			_moves[index].emplace_back(index, index + 2, Move::FlagCodes::KCastle);
+		}
+	}
+}
+
+bool Chess::isPinned(int index) {
+	return false;
+}
+
+bool Chess::isMovingAlongRay(int asile, int startSquare, int targetSquare) {
+	int moveDir = dir[targetSquare - startSquare + 63];
+	return (asile == moveDir || -asile == moveDir);
+}
+
+bool Chess::squareIsInCheckRay(int square) {
+	return inCheck && ((checkRayBitmask >> square) & 1) != 0;
 }
 
 // nothing for chess
@@ -426,7 +501,7 @@ std::string Chess::stateString() {
 				s += std::to_string(emptyCount); // Append remaining empty squares at end of row
 				emptyCount = 0;
 			}
-			if (i != (_gameOps.size - 1U)) {
+			if (i != (_gameOps.size - 1)) {
 				s += '/'; // Add row separator
 				rank = 0;
 				file--;
@@ -467,6 +542,10 @@ std::string Chess::stateString() {
 // when the program starts it will load the current game from the imgui ini file and set the game state to the last saved state
 // modified from Sebastian Lague's Coding Adventure on Chess. 2:37
 void Chess::setStateString(const std::string& fen) {
+	ProtoBoard board;
+	uint8_t wKingSquare;
+	uint8_t bKingSquare;
+
 	size_t i = 0;
 	{ int file = 7, rank = 0;
 	for (; i < fen.size(); i++) {
@@ -486,9 +565,16 @@ void Chess::setStateString(const std::string& fen) {
 				// b/c white is considered as "0" elsewhere in the code, it makes
 				// more sense to specifically check ifBlack, even if FEN has it the
 				// other way around.
+				if (symbol == 'K') {
+					wKingSquare = file * 8 + rank;
+				} else if (symbol == 'k') {
+					bKingSquare = file * 8 + rank;
+				}
+
 				int isBlack = !std::isupper(symbol);
 				ChessPiece piece = pieceFromSymbol.at(std::tolower(symbol));
 				_grid[file * 8 + rank].setBit(PieceForPlayer(isBlack, piece));
+				board.enable(piece, isBlack, file * 8 + rank);
 				rank++;
 			}
 		}
@@ -496,7 +582,7 @@ void Chess::setStateString(const std::string& fen) {
 
 	i++;
 	if (i >= fen.size()) {
-		_state.emplace(fen, 0, 0b1111, 255, 0, 0);
+		_state.emplace(board, 0, 0b1111, 255, 0, 0, wKingSquare, bKingSquare);
 		return;
 	}
 
@@ -531,7 +617,7 @@ void Chess::setStateString(const std::string& fen) {
 	while (std::isdigit(fen[++i])) { hClock = hClock * 10 + (fen[i] - '0'); }
 	while (std::isdigit(fen[++i])) { fClock = fClock * 10 + (fen[i] - '0'); }
 
-	_state.emplace(fen, isBlack, castling, enTarget, hClock, fClock);
+	_state.emplace(board, isBlack, castling, enTarget, hClock, fClock, wKingSquare, bKingSquare);
 }
 
 // this is the function that will be called by the AI

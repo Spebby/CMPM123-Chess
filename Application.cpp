@@ -51,7 +51,7 @@ namespace ClassGame {
 	}
 
 	void drawState() {
-		ImGui::BeginChild("State", ImVec2(300, 200), true);
+		ImGui::BeginChild("State", ImVec2(300, 400), true);
 		GameState state = game->getState();
 		ImGui::Text("Game State");
 		ImGui::Text("Clock: %d", state.getClock());
@@ -61,19 +61,90 @@ namespace ClassGame {
 		ImGui::Text("Castle Rights %d", state.getCastlingRights());
 
 		std::string stateStr = "";
-		const char* t = state.getState();
+		ProtoBoard bitboard = state.getProtoBoard();
+
+		const std::map<ChessPiece, char> symbolFromPiece = {
+			{ChessPiece::Pawn, 'p'},
+			{ChessPiece::Knight, 'n'},
+			{ChessPiece::Bishop, 'b'},
+			{ChessPiece::Rook, 'r'},
+			{ChessPiece::Queen, 'q'},
+			{ChessPiece::King, 'k'}
+		};
+
 		int file = 8;
 		int rank = 0;
-		for (int i = 0; i < 64; i++) {
-			if (i % 8 == 0) {
+		for (int k = 0; k < 64; k++) {
+			if (k % 8 == 0) {
 				stateStr += '\n';
 				file--;
 				rank = 0;
 			}
-			stateStr += t[file * 8 + rank];
+
+			ChessPiece piece = bitboard.PieceFromIndex(file * 8 + rank);
+			if (piece == ChessPiece::NoPiece) {
+				stateStr += '0';
+				rank++;
+				continue;
+			}
+			char symbol = symbolFromPiece.at((ChessPiece)(piece & 7));
+			if ((piece & 8) == 0) {
+				symbol = toupper(symbol);
+			}
+
+			stateStr += symbol;
 			rank++;
 		}
 		ImGui::Text("%s", stateStr.c_str());
+
+		for (int i = 0; i < 12; i++) {
+			std::string s;
+
+			int piece = 0;
+
+			if (i < 6) {
+				s += 'w';
+			} else {
+				s += 'b';
+				piece = 8;
+			}
+
+			int j = i < 6 ?  i : i - 6;
+			switch (j) {
+				case 0:
+					s += "P ";
+					piece |= 0b001;
+					break;
+				case 1:
+					s += "Kn";
+					piece |= 0b010;
+					break;
+				case 2:
+					s += "B ";
+					piece |= 0b011;
+					break;
+				case 3:
+					s += "R ";
+					piece |= 0b100;
+					break;
+				case 4:
+					s += "Q ";
+					piece |= 0b101;
+					break;
+				case 5:
+					s += "K ";
+					piece |= 0b110;
+					break;
+			}
+			s += " -- ";
+
+			auto pos = bitboard.getBitPositions((ChessPiece)piece);
+			for (int i : pos) {
+				s += ChessSquare::indexToPosNotation(i) + " ";
+			}
+			ImGui::Text("%s", s.c_str());
+		}
+		
 		ImGui::EndChild();
 	}
 

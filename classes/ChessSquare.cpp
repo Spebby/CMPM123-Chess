@@ -1,5 +1,4 @@
 #include "ChessSquare.h"
-#include "Chess.h"
 #include "Bit.h"
 #include "../tools/Logger.h"
 
@@ -39,6 +38,7 @@ void ChessSquare::setBit(Bit* abit) {
 	_pieceNotation = generateNotation(bit);
 }
 
+const int spriteSize = 64;
 void ChessSquare::initHolder(const ImVec2 &position, const char *spriteName, const int column, const int row) {
 	_column = column;
 	_row = row;
@@ -48,7 +48,7 @@ void ChessSquare::initHolder(const ImVec2 &position, const char *spriteName, con
 	BitHolder::initHolder(position, color, spriteName);
 	Loggy.log("Holder created at: " + formatCords(column, row) 
 							+ " -- " + formatCords(position.x, position.y));
-	setSize(pieceSize, pieceSize);
+	setSize(spriteSize, spriteSize);
 }
 
 bool ChessSquare::canDropBitAtPoint(Bit *newbit, const ImVec2 &point) {

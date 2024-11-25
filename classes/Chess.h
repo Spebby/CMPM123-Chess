@@ -7,18 +7,7 @@
 #include "Game.h"
 #include "ChessSquare.h"
 #include "GameState.h"
-
-const int pieceSize = 64;
-
-enum ChessPiece {
-	NoPiece	= 0,
-	Pawn	= 1,
-	Knight	= 2,
-	Bishop	= 3,
-	Rook	= 4,
-	Queen	= 5,
-	King	= 6
-};
+#include "ChessPiece.h"
 
 // the main game class
 class Chess : public Game {
@@ -40,6 +29,11 @@ public:
 	void		bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
 
 	void moveGenerator();
+	bool isPinned(int);
+	bool isMovingAlongRay(int, int, int);
+	bool squareIsInCheckRay(int);
+
+	void generateKingMoves(int, ChessSquare&, bool);
 
 	void		stopGame() override;
 	BitHolder&	getHolderAt(const int x, const int y) override { return _grid[y * 8 + x]; }

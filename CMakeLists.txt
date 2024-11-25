@@ -51,6 +51,7 @@ set(SOURCES
 	imgui/imgui.cpp
 	imgui/imgui_impl_opengl3.cpp
     classes/Move.cpp
+    classes/ProtoBoard.cpp
     classes/GameState.cpp
     classes/Bit.cpp
     classes/BitHolder.cpp
@@ -65,6 +66,11 @@ set(SOURCES
 
 # Define the executable and sources
 add_executable(Chess ${SOURCES})
+
+# headers used to make IDEs not scream at me.
+target_sources(Chess PRIVATE
+    classes/ChessPiece.h
+)
 
 # Link libraries based on the platform
 if(MACOS OR LINUX)
