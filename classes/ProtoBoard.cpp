@@ -39,7 +39,12 @@ uint64_t& ProtoBoard::getBitBoard(ChessPiece piece, bool isBlack) {
 }
 
 std::vector<uint8_t> ProtoBoard::getBitPositions(ChessPiece piece, bool isBlack) const {
-    return getBitPositions(bits[pieceToBoard(piece, isBlack)]);
+    std::vector<uint8_t> pos;
+    getBitPositions([&pos](uint8_t index) {
+        pos.push_back(index);
+    }, bits[pieceToBoard(piece, isBlack)]);
+
+    return pos;
 }
 
 // GameTag versions
@@ -48,7 +53,12 @@ uint64_t& ProtoBoard::getBitBoard(ChessPiece piece) {
 }
 
 std::vector<uint8_t> ProtoBoard::getBitPositions(ChessPiece piece) const {
-    return getBitPositions(bits[pieceToBoard(piece)]);
+    std::vector<uint8_t> pos;
+    getBitPositions([&pos](uint8_t index) {
+        pos.push_back(index);
+    }, bits[pieceToBoard(piece)]);
+
+    return pos;
 }
 
 ChessPiece ProtoBoard::PieceFromIndex(uint8_t index) const {
@@ -69,16 +79,12 @@ ChessPiece ProtoBoard::PieceFromIndex(uint8_t index) const {
     return (ChessPiece)0;
 }
 
-
 // privates
-std::vector<uint8_t> ProtoBoard::getBitPositions(uint64_t bitboard) const {
-    std::vector<uint8_t> positions;
+template <typename Func>
+void ProtoBoard::getBitPositions(Func func, uint64_t bitboard) const {
     while (bitboard) {
-        // TODO: Ask Graeme if this is a safe way to BitScan!!
-        unsigned long index = __builtin_ctzll(bitboard);
-        positions.push_back(static_cast<int>(index));
-        bitboard &= bitboard - 1; // Clear the least significant set bit
+        uint8_t index = bitScanForward(bitboard);
+        func(index);
+        bitboard &= bitboard - 1;
     }
-
-    return positions;
 }
