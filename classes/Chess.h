@@ -28,7 +28,7 @@ public:
 	bool		canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) override;
 	void		bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
 
-	void moveGenerator();
+	void MoveGenerator();
 	bool isPinned(int);
 	bool isMovingAlongRay(int, int, int);
 	bool squareIsInCheckRay(int);
@@ -52,6 +52,9 @@ private:
 	const char		bitToPieceNotation(int rank, int file) const;
     const char		bitToPieceNotation(int i) const;
 	inline void 	clearPositionHighlights();
+
+	void CalculateAttackData();
+	void UpdateSlidingLanes(int, int, int);
 
 	// distances at a given position to the board's boundries. North, East, South, West, NE, SE, SW, NW
 	int _dist[64][8];

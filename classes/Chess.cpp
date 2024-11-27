@@ -1,6 +1,7 @@
 #include <cmath>
 #include <stdexcept>
 #include "Chess.h"
+#include "magicbitboards.h"
 #include "../tools/Logger.h"
 
 Chess::Chess() {
@@ -25,6 +26,8 @@ Chess::Chess() {
 		}
 	}
 	
+	initMagicBitboards();
+
 	// TODO: replace _state with vector & manage it like it's a stack internally.
 }
 
@@ -99,36 +102,78 @@ void Chess::setUpBoard() {
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
 	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 	startGame();
-	moveGenerator();
+	MoveGenerator();
 }
 
-bool inCheck = false;
-bool pinned = false;
-bool doublePin = false;
-bool pinInPosition = false;
-uint8_t checkRayBitmask = 0;
-uint8_t pinRayBitmask = 0;
+// I'll probably have to move these into move generator so I can recursively call move generator
+bool inCheck;
+bool pinned;
+bool doublePin;
+bool pinInPosition;
+uint8_t checkRayBitmask;
+uint8_t pinRayBitmask;
+uint8_t friendlyKingSquare;
+uint64_t attackMap;
 const int dir[8] = {8, 1, -8, -1, 9, -7, -9, 7};
+
 
 inline void ReInitGen() {
 	inCheck = false;
 	pinned = false;
 	doublePin = false;
 	pinInPosition = false;
-	checkRayBitmask = 0;
-	pinRayBitmask = 0;
+	checkRayBitmask = 0U;
+	pinRayBitmask = 0U;
 }
 
-inline void CalculateAttackData() {
+void Chess::CalculateAttackData() {
+	attackMap = 0ULL;
+	// update sliding attack lanes
+	uint64_t occupancy = _state.top().getProtoBoard().getOccupancyBoard();
+	int offset = (!_state.top().isBlackTurn() << 3);
+	{
+		std::vector<uint8_t> rooks = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Rook | offset));
+		for (int i : rooks) {
+			attackMap |= getRookAttacks(i, occupancy);
+			Loggy.log(Logger::WARNING, "Rook - " + std::to_string(i) + " " + std::to_string(getRookAttacks(i, occupancy)));
+		}
+	}
 
+	{
+		std::vector<uint8_t> bishops = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Bishop | offset));
+		for (int i : bishops) {
+			attackMap |= getBishopAttacks(i, occupancy);
+			Loggy.log(Logger::WARNING, "Bish - " + std::to_string(i) + " " + std::to_string(getBishopAttacks(i, occupancy)));
+		}
+	}
+
+	{
+		std::vector<uint8_t> queens = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Queen | offset));
+		for (int i : queens) {
+			attackMap |= getQueenAttacks(i, occupancy);
+			Loggy.log(Logger::WARNING, "Queen - " + std::to_string(i) + " " + std::to_string(getQueenAttacks(i, occupancy)));
+		}
+	}
+
+	// check around king to see if we're in danger
+
+
+	// generate knight moves
+	{
+		std::vector<uint8_t> knights = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Knight | offset));
+		for (int i : knights) {
+			attackMap |= KnightAttacks[i];
+		}
+	}
 }
 
-void Chess::moveGenerator() {
+void Chess::MoveGenerator() {
 	// this isn't optimised the best; in the future we'll want to use bitboards instead.
 	_moves.clear();
 
 	// reset variables.
 	ReInitGen();
+	friendlyKingSquare = _state.top().getEnemyKingSquare();
 	CalculateAttackData();
 
 	// Re-determin pinned & other states.
@@ -136,7 +181,6 @@ void Chess::moveGenerator() {
 	// ================================
 	// ================================
 
-	uint8_t friendlyKingSquare = _state.top().getEnemyKingSquare();
 	if (doublePin) {
 		generateKingMoves(friendlyKingSquare, _grid[friendlyKingSquare], !_state.top().isBlackTurn());
 	}
@@ -292,6 +336,8 @@ void Chess::moveGenerator() {
 }
 
 void Chess::generateKingMoves(int index, ChessSquare& square, bool black) {
+	// TODO: add check on castling to see if in danger.
+	// due to us pre-calculating dangerous squares, we can simply & the bits and see if they're non-zero.
 	for (int i = 0; i < 8; i++) {
 		if (_dist[index][i] < 1) continue;
 		int targ = index + dir[i];
@@ -444,7 +490,7 @@ void Chess::bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) {
 	Game::bitMovedFromTo(bit, src, dst);
 
 	clearPositionHighlights();
-	moveGenerator();
+	MoveGenerator();
 }
 
 inline void Chess::clearPositionHighlights() {

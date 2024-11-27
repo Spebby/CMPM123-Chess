@@ -1,12 +1,12 @@
 // this is vodoo stuff. don't worry about it too much.
 // provided by professor.
 
+#pragma once
+
 #ifndef MAGIC_BITBOARDS_H
 #define MAGIC_BITBOARDS_H
 
 #include <stdint.h>
-
-typedef uint64_t Bitboard;
 
 // Generate rook attacks for a given square and blocking pieces
 static inline uint64_t ratt(int sq, uint64_t block) {
@@ -269,8 +269,8 @@ const int BAttackSize[64] = {
 };
 
 // Attack lookup tables
-static Bitboard* RAttacks[64];
-static Bitboard* BAttacks[64];
+static uint64_t* RAttacks[64];
+static uint64_t* BAttacks[64];
 
 // Magic bitboard shift amounts
 const int RShifts[64] = {
@@ -840,7 +840,7 @@ void initMagicBitboards(void) {
 
 	// Initialize rook attack tables
 	for (square = 0; square < 64; square++) {
-		RAttacks[square] = new Bitboard[RAttackSize[square]];
+		RAttacks[square] = new uint64_t[RAttackSize[square]];
 		uint64_t mask = RMasks[square];
 		int bits = countOnes(mask);
 		int n = 1 << bits;
@@ -854,7 +854,7 @@ void initMagicBitboards(void) {
 
 	// Initialize bishop attack tables
 	for (square = 0; square < 64; square++) {
-		BAttacks[square] = new Bitboard[BAttackSize[square]];
+		BAttacks[square] = new uint64_t[BAttackSize[square]];
 		uint64_t mask = BMasks[square];
 		int bits = countOnes(mask);
 		int n = 1 << bits;

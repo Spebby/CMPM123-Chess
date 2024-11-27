@@ -50,6 +50,15 @@ namespace ClassGame {
 		ImGui::EndChild();
 	}
 
+	const std::map<ChessPiece, char> symbolFromPiece = {
+		{ChessPiece::Pawn, 'p'},
+		{ChessPiece::Knight, 'n'},
+		{ChessPiece::Bishop, 'b'},
+		{ChessPiece::Rook, 'r'},
+		{ChessPiece::Queen, 'q'},
+		{ChessPiece::King, 'k'}
+	};
+
 	void drawState() {
 		ImGui::BeginChild("State", ImVec2(300, 400), true);
 		GameState state = game->getState();
@@ -62,15 +71,6 @@ namespace ClassGame {
 
 		std::string stateStr = "";
 		ProtoBoard bitboard = state.getProtoBoard();
-
-		const std::map<ChessPiece, char> symbolFromPiece = {
-			{ChessPiece::Pawn, 'p'},
-			{ChessPiece::Knight, 'n'},
-			{ChessPiece::Bishop, 'b'},
-			{ChessPiece::Rook, 'r'},
-			{ChessPiece::Queen, 'q'},
-			{ChessPiece::King, 'k'}
-		};
 
 		int file = 8;
 		int rank = 0;

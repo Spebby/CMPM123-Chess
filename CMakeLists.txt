@@ -70,6 +70,7 @@ add_executable(Chess ${SOURCES})
 # headers used to make IDEs not scream at me.
 target_sources(Chess PRIVATE
     classes/ChessPiece.h
+    classes/magicbitboards.h
 )
 
 # Link libraries based on the platform
