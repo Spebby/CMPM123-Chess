@@ -2,7 +2,10 @@
 #include <stdexcept>
 #include "Chess.h"
 #include "magicbitboards.h"
+#include "bitboardHelper.h"
 #include "../tools/Logger.h"
+
+#define currState _state.top()
 
 Chess::Chess() {
 	// precompute dist.
@@ -32,7 +35,7 @@ Chess::Chess() {
 }
 
 Chess::~Chess() {
-
+	cleanupMagicBitboards();
 }
 
 const std::map<char, ChessPiece> pieceFromSymbol = {
@@ -108,7 +111,7 @@ void Chess::setUpBoard() {
 // I'll probably have to move these into move generator so I can recursively call move generator
 bool inCheck;
 bool pinned;
-bool doublePin;
+bool doubleCheck;
 bool pinInPosition;
 uint8_t checkRayBitmask;
 uint8_t pinRayBitmask;
@@ -120,51 +123,14 @@ const int dir[8] = {8, 1, -8, -1, 9, -7, -9, 7};
 inline void ReInitGen() {
 	inCheck = false;
 	pinned = false;
-	doublePin = false;
+	doubleCheck = false;
 	pinInPosition = false;
 	checkRayBitmask = 0U;
 	pinRayBitmask = 0U;
 }
 
 void Chess::CalculateAttackData() {
-	attackMap = 0ULL;
-	// update sliding attack lanes
-	uint64_t occupancy = _state.top().getProtoBoard().getOccupancyBoard();
-	int offset = (!_state.top().isBlackTurn() << 3);
-	{
-		std::vector<uint8_t> rooks = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Rook | offset));
-		for (int i : rooks) {
-			attackMap |= getRookAttacks(i, occupancy);
-			Loggy.log(Logger::WARNING, "Rook - " + std::to_string(i) + " " + std::to_string(getRookAttacks(i, occupancy)));
-		}
-	}
-
-	{
-		std::vector<uint8_t> bishops = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Bishop | offset));
-		for (int i : bishops) {
-			attackMap |= getBishopAttacks(i, occupancy);
-			Loggy.log(Logger::WARNING, "Bish - " + std::to_string(i) + " " + std::to_string(getBishopAttacks(i, occupancy)));
-		}
-	}
-
-	{
-		std::vector<uint8_t> queens = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Queen | offset));
-		for (int i : queens) {
-			attackMap |= getQueenAttacks(i, occupancy);
-			Loggy.log(Logger::WARNING, "Queen - " + std::to_string(i) + " " + std::to_string(getQueenAttacks(i, occupancy)));
-		}
-	}
-
-	// check around king to see if we're in danger
-
-
-	// generate knight moves
-	{
-		std::vector<uint8_t> knights = _state.top().getProtoBoard().getBitPositions((ChessPiece)(ChessPiece::Knight | offset));
-		for (int i : knights) {
-			attackMap |= KnightAttacks[i];
-		}
-	}
+	attackMap = currState.getSlidingAttackBoard();
 }
 
 void Chess::MoveGenerator() {
@@ -173,17 +139,21 @@ void Chess::MoveGenerator() {
 
 	// reset variables.
 	ReInitGen();
-	friendlyKingSquare = _state.top().getEnemyKingSquare();
+	friendlyKingSquare = currState.getEnemyKingSquare();
 	CalculateAttackData();
+	printBitboard("Attack Map", attackMap);
 
 	// Re-determin pinned & other states.
 
 	// ================================
 	// ================================
 
-	if (doublePin) {
-		generateKingMoves(friendlyKingSquare, _grid[friendlyKingSquare], !_state.top().isBlackTurn());
+	// Only king moves valid with double check
+	if (doubleCheck) {
+		generateKingMoves(friendlyKingSquare, _grid[friendlyKingSquare], !currState.isBlackTurn());
+		return;
 	}
+
 
 	for (ChessSquare& square : _grid) {
 		// we only do half of the moves b/c we'll have to recalculate all moves next turn anyway
@@ -207,6 +177,8 @@ void Chess::MoveGenerator() {
 
 		// unless I know a value will be sent to the move constructor,
 		// i'm not going to bother making everything a uint b/c readability & highlighting
+
+		// TODO: move all of these generates to helper functions, so we can better make use of bitscanning & helpers
 		switch (piece) {
 			case ChessPiece::Rook:
 				// awesome logic that'll fall through
@@ -286,7 +258,7 @@ void Chess::MoveGenerator() {
 					bool rValid = (dirIndex == 1) && (targ  % _gameOps.X) < (nTarg % _gameOps.X);
 					if (lValid || rValid) {
 						ChessBit* bit = _grid[nTarg].bit();
-						bool enPassant = _state.top().getEnPassantSquare() == nTarg;
+						bool enPassant = currState.getEnPassantSquare() == nTarg;
 						bool capture   = bit && !bit->isAlly(square.bit());
 						// if enpassant square is specified, then we know it's a legal move b/c en passant square is set on previous turn.
 						if (enPassant || capture) {
@@ -354,7 +326,7 @@ void Chess::generateKingMoves(int index, ChessSquare& square, bool black) {
 		_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling);
 	}
 
-	uint8_t rights = _state.top().getCastlingRights();
+	uint8_t rights = currState.getCastlingRights();
 	// Queenside
 	if ((rights & black ? 0b0100 : 0b0001) != 0) {
 		if (!_grid[index - 1].bit() && !_grid[index - 2].bit() && !_grid[index - 3].bit()) {
@@ -441,11 +413,11 @@ void Chess::bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) {
 	}
 
 	// EnPassant Check
-	if (_state.top().getEnPassantSquare() == j) {
-		_grid[j + (_state.top().isBlackTurn() ? 8 : -8)].destroyBit();
+	if (currState.getEnPassantSquare() == j) {
+		_grid[j + (currState.isBlackTurn() ? 8 : -8)].destroyBit();
 		// increment score.
 	} else if (move->isCastle() && ((bit.gameTag() & ChessPiece::King) == ChessPiece::King)) { // castle
-		uint8_t offset = _state.top().isBlackTurn() ? 56 : 0;
+		uint8_t offset = currState.isBlackTurn() ? 56 : 0;
 		uint8_t rookSpot = (move->QueenSideCastle() ? 0 : 7) + offset;
 		uint8_t targ = (move->QueenSideCastle() ? 3 : 5) + offset;
 		_grid[targ].setBit(_grid[rookSpot].bit());
@@ -469,19 +441,19 @@ void Chess::bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) {
 		}
 
 		// awesome cast
-		dstSquare.setBit(PieceForPlayer(_state.top().isBlackTurn(), (ChessPiece)newPiece));
+		dstSquare.setBit(PieceForPlayer(currState.isBlackTurn(), (ChessPiece)newPiece));
 	}
 
 	// check if we took a rook
-	_state.emplace(_state.top(), *move);
+	_state.emplace(currState, *move);
 	if (j == 63 || j == 56 || j == 0 || j == 7) {
-		uint8_t flag = _state.top().getCastlingRights();
+		uint8_t flag = currState.getCastlingRights();
 		if (j == 56 || j == 0) {
-			flag &= _state.top().isBlackTurn() ? ~0b0001 : ~0b0100;
+			flag &= currState.isBlackTurn() ? ~0b0001 : ~0b0100;
 		} else if (j == 63 || j == 7) {
-			flag &= _state.top().isBlackTurn() ? ~0b0010 : ~0b1000;
+			flag &= currState.isBlackTurn() ? ~0b0010 : ~0b1000;
 		}
-		_state.top().setCastlingRights(flag);
+		currState.setCastlingRights(flag);
 	}
 
 	// do some check to prompt the UI to select a promotion.
@@ -558,7 +530,7 @@ std::string Chess::stateString() {
 	s += getCurrentPlayer()->playerNumber() ? " b " : " w ";
 	std::string castlingRights;
 	{
-		uint8_t rights = _state.top().getCastlingRights();
+		uint8_t rights = currState.getCastlingRights();
 		if (rights != 0) {
 			if (rights & 0b1000) castlingRights += 'K';
 			if (rights & 0b0100) castlingRights += 'Q';
@@ -571,7 +543,7 @@ std::string Chess::stateString() {
 	s += castlingRights;
 
 	{
-		uint8_t enP = _state.top().getEnPassantSquare();
+		uint8_t enP = currState.getEnPassantSquare();
 		if (enP < 64) {
 			s += ' ' + _grid[enP].getPositionNotation() + ' ';
 		} else {
@@ -579,7 +551,7 @@ std::string Chess::stateString() {
 		}
 	}
 
-	s += std::to_string((int)_state.top().getHalfClock()) + ' ' + std::to_string((int)_state.top().getClock());
+	s += std::to_string((int)currState.getHalfClock()) + ' ' + std::to_string((int)currState.getClock());
 
 	return s;
 }

@@ -29,11 +29,6 @@ bool ProtoBoard::operator==(const ProtoBoard& other) {
     return true;
 }
 
-uint64_t ProtoBoard::getOccupancyBoard() const {
-    return bits[0] | bits[1] | bits[2] | bits[3] | bits[4]  | bits[5] 
-            | bits[6] | bits[7] | bits[8] | bits[9] | bits[10] | bits[11];
-}
-
 uint64_t& ProtoBoard::getBitBoard(ChessPiece piece, bool isBlack) {
     return bits[pieceToBoard(piece, isBlack)];
 }

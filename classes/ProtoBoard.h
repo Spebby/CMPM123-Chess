@@ -28,7 +28,11 @@ class ProtoBoard {
         bits[pieceToBoard(piece, isBlack)] &= ~(1ULL << pos);
     }
 
-    uint64_t getOccupancyBoard() const;
+    inline uint64_t getOccupancyBoard() const { return bits[0] | bits[1] | bits[2] | bits[3] | bits[4]  | bits[5] 
+                                                | bits[6] | bits[7] | bits[8] | bits[9] | bits[10] | bits[11]; }
+    inline uint64_t getWhiteOccupancyBoard() const { return bits[0] | bits[1] | bits[2] | bits[3] | bits[4]  | bits[5]; }
+    inline uint64_t getBlackOccupancyBoard() const { return bits[6] | bits[7] | bits[8] | bits[9] | bits[10] | bits[11]; }
+
     uint64_t& getBitBoard(ChessPiece piece, bool isBlack);
     std::vector<uint8_t> getBitPositions(ChessPiece piece, bool isBlack) const;
 

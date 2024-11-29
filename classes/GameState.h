@@ -32,6 +32,10 @@ class GameState {
 	uint8_t getEnemyKingSquare()    const { return enemyKingSquare; }
 	uint8_t getFriendlyKingSquare() const { return friendlyKingSquare; }
 
+	uint64_t getSlidingAttackBoard() const;
+
+	uint64_t getFriendlyOccuupancySquare() const { return isBlack ? bits.getBlackOccupancyBoard() : bits.getWhiteOccupancyBoard(); }
+	uint64_t getEnemyOccuupancySquare()    const { return isBlack ? bits.getWhiteOccupancyBoard() : bits.getBlackOccupancyBoard(); }
 
 	// TODO: init state w/ proper values. For later!
 

@@ -54,7 +54,6 @@ private:
 	inline void 	clearPositionHighlights();
 
 	void CalculateAttackData();
-	void UpdateSlidingLanes(int, int, int);
 
 	// distances at a given position to the board's boundries. North, East, South, West, NE, SE, SW, NW
 	int _dist[64][8];

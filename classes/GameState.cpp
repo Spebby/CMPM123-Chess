@@ -2,6 +2,7 @@
 
 #include "GameState.h"
 #include "../tools/Logger.h"
+#include "magicbitboards.h"
 
 const uint8_t MAX_DEPTH = 24; // for AI purposes
 // Generate from FEN
@@ -113,4 +114,39 @@ bool GameState::operator==(const GameState& other) {
 			halfClock == other.halfClock &&
 			clock == other.clock &&
 			isBlack == other.isBlack;
+}
+
+uint64_t GameState::getSlidingAttackBoard() const {
+	uint64_t attackMap = 0ULL;
+	// update sliding attack lanes
+	uint64_t occupancy = bits.getOccupancyBoard();
+	int offset = (!isBlackTurn() << 3);
+	{
+		std::vector<uint8_t> rooks = bits.getBitPositions((ChessPiece)(ChessPiece::Rook | offset));
+		for (int i : rooks) {
+			attackMap |= getRookAttacks(i, occupancy);
+			attackMap & ~getFriendlyOccuupancySquare();
+			Loggy.log(Logger::WARNING, "Rook - " + std::to_string(i) + " " + std::to_string(getRookAttacks(i, occupancy)));
+		}
+	}
+
+	{
+		std::vector<uint8_t> bishops = bits.getBitPositions((ChessPiece)(ChessPiece::Bishop | offset));
+		for (int i : bishops) {
+			attackMap |= getBishopAttacks(i, occupancy);
+			attackMap & ~getFriendlyOccuupancySquare();
+			Loggy.log(Logger::WARNING, "Bish - " + std::to_string(i) + " " + std::to_string(getBishopAttacks(i, occupancy)));
+		}
+	}
+
+	{
+		std::vector<uint8_t> queens = bits.getBitPositions((ChessPiece)(ChessPiece::Queen | offset));
+		for (int i : queens) {
+			attackMap |= getQueenAttacks(i, occupancy);
+			attackMap & ~getFriendlyOccuupancySquare();
+			Loggy.log(Logger::WARNING, "Queen - " + std::to_string(i) + " " + std::to_string(getQueenAttacks(i, occupancy)));
+		}
+	}
+
+	return attackMap;
 }
