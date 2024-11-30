@@ -2,6 +2,7 @@
 // I use some bitscanning to efficiently extract data from bitboards.
 #include <cstring>
 #include "ProtoBoard.h"
+#include "magicbitboards.h"
 
 ProtoBoard::ProtoBoard() {
     std::memset(bits, 0, sizeof(bits));
@@ -35,7 +36,7 @@ uint64_t& ProtoBoard::getBitBoard(ChessPiece piece, bool isBlack) {
 
 std::vector<uint8_t> ProtoBoard::getBitPositions(ChessPiece piece, bool isBlack) const {
     std::vector<uint8_t> pos;
-    getBitPositions([&pos](uint8_t index) {
+    forEachBit([&pos](uint8_t index) {
         pos.push_back(index);
     }, bits[pieceToBoard(piece, isBlack)]);
 
@@ -49,7 +50,7 @@ uint64_t& ProtoBoard::getBitBoard(ChessPiece piece) {
 
 std::vector<uint8_t> ProtoBoard::getBitPositions(ChessPiece piece) const {
     std::vector<uint8_t> pos;
-    getBitPositions([&pos](uint8_t index) {
+    forEachBit([&pos](uint8_t index) {
         pos.push_back(index);
     }, bits[pieceToBoard(piece)]);
 
@@ -72,14 +73,4 @@ ChessPiece ProtoBoard::PieceFromIndex(uint8_t index) const {
     }
 
     return (ChessPiece)0;
-}
-
-// privates
-template <typename Func>
-void ProtoBoard::getBitPositions(Func func, uint64_t bitboard) const {
-    while (bitboard) {
-        uint8_t index = bitScanForward(bitboard);
-        func(index);
-        bitboard &= bitboard - 1;
-    }
 }

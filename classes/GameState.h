@@ -26,16 +26,20 @@ class GameState {
 	uint8_t getHalfClock()		const { return halfClock; }
 	uint16_t getClock() const { return clock; }
 	void setCastlingRights(const uint8_t rights) { castlingRights = rights; }
+	// consider not allowing direct access to protoboard
 	ProtoBoard& getProtoBoard() { return bits; }
 	//const char* getState() const { return state; }
 
 	uint8_t getEnemyKingSquare()    const { return enemyKingSquare; }
 	uint8_t getFriendlyKingSquare() const { return friendlyKingSquare; }
 
-	uint64_t getSlidingAttackBoard() const;
+	//uint64_t getSlidingAttackBoard() const;
 
-	uint64_t getFriendlyOccuupancySquare() const { return isBlack ? bits.getBlackOccupancyBoard() : bits.getWhiteOccupancyBoard(); }
-	uint64_t getEnemyOccuupancySquare()    const { return isBlack ? bits.getWhiteOccupancyBoard() : bits.getBlackOccupancyBoard(); }
+	uint64_t getOccupancyBoard() const { return bits.getOccupancyBoard(); }
+	uint64_t getFriendlyOccuupancyBoard() const { return isBlack ? bits.getBlackOccupancyBoard() : bits.getWhiteOccupancyBoard(); }
+	uint64_t getEnemyOccuupancyBoard()    const { return isBlack ? bits.getWhiteOccupancyBoard() : bits.getBlackOccupancyBoard(); }
+
+	const uint64_t& getPieceOccupancyBoard(ChessPiece piece, bool isBlack) const { return bits[isBlack ? (piece + 5) : piece - 1]; }
 
 	// TODO: init state w/ proper values. For later!
 

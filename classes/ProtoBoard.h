@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <stdexcept>
 #include "ChessPiece.h"
 
 class ProtoBoard {
@@ -15,6 +16,22 @@ class ProtoBoard {
     ProtoBoard& operator=(const ProtoBoard& other);
 
     bool operator==(const ProtoBoard& other);
+
+    // modify
+    uint64_t& operator[](size_t index) {
+        if (index >= 12) {
+            throw std::out_of_range("Index out of bounds");
+        }
+        return bits[index];
+    }
+
+    // read-only
+    const uint64_t& operator[](size_t index) const {
+        if (index >= 12) {
+            throw std::out_of_range("Index out of bounds");
+        }
+        return bits[index];
+    }
 
     inline void set(const ChessPiece piece, const bool isBlack, const uint64_t board) {
         bits[pieceToBoard(piece, isBlack)] = board;
@@ -61,20 +78,6 @@ class ProtoBoard {
     inline int pieceToBoard(ChessPiece piece) const {
         return (piece & 8) ? ((piece & 7) + 5) : (piece & 7) - 1;
     }
-
-
-    template <typename Func>
-    void getBitPositions(Func func, uint64_t bitboard) const;
-
-    inline uint8_t bitScanForward(uint64_t bb) const {
-    #if defined(_MSC_VER) && !defined(__clang__)
-        unsigned long index;
-        _BitScanForward64(&index, bb);
-        return index;
-    #else
-        return __builtin_ffsll(bb) - 1;
-    #endif
-    };
 
     // https://www.chessprogramming.org/Bitboards
     // 0-5 is White,   6 - 11 is Black.

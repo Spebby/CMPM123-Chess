@@ -9,3 +9,15 @@ enum ChessPiece {
 	Queen	= 5,
 	King	= 6
 };
+
+inline bool IsDiagonalPiece(ChessPiece piece) {
+	return (piece == ChessPiece::Queen) || (piece == ChessPiece::Bishop);
+}
+
+inline bool IsHorizontalPiece(ChessPiece piece) {
+	return (piece == ChessPiece::Queen) || (piece == ChessPiece::Rook);
+}
+
+inline bool IsSlidingPiece(ChessPiece piece) {
+	return (piece == ChessPiece::Queen) ||(piece == ChessPiece::Rook) || (piece == ChessPiece::Bishop);
+}

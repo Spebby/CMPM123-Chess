@@ -1,4 +1,3 @@
-// this is vodoo stuff. don't worry about it too much.
 // provided by professor.
 
 #pragma once
@@ -6,7 +5,8 @@
 #ifndef MAGIC_BITBOARDS_H
 #define MAGIC_BITBOARDS_H
 
-#include <stdint.h>
+#include <cstdint>
+#include "BitFunctions.h"
 
 // Generate rook attacks for a given square and blocking pieces
 static inline uint64_t ratt(int sq, uint64_t block) {
@@ -64,41 +64,6 @@ static inline uint64_t batt(int sq, uint64_t block) {
 	return result;
 }
 
-// Compiler-specific bit manipulation functions
-#ifdef __clang__
-	// Clang/LLVM specific bit counting
-	static inline int countOnes(uint64_t b) {
-		return __builtin_popcountll(b);
-	}
-
-	// Find first set bit (returns 0-63, undefined for b==0)
-	static inline int getFirstBit(uint64_t b) {
-		return __builtin_ctzll(b);
-	}
-#else
-	// Fallback bit counting implementation
-	static inline int countOnes(uint64_t b) {
-		int r = 0;
-		while (b) {
-			r++;
-			b &= b - 1;
-		}
-		return r;
-	}
-
-	// Fallback first bit implementation
-	static inline int getFirstBit(uint64_t b) {
-		const int BitTable[64] = {
-			63, 30, 3, 32, 25, 41, 22, 33, 15, 50, 42, 13, 11, 53, 19, 34,
-			61, 29, 2, 51, 21, 43, 45, 10, 18, 47, 1, 54, 9, 57, 0, 35,
-			62, 31, 40, 4, 49, 5, 52, 26, 60, 6, 23, 44, 46, 27, 56, 16,
-			7, 39, 48, 24, 59, 14, 12, 55, 38, 28, 58, 20, 37, 17, 36, 8
-		};
-		uint64_t debruijn = 0x03f79d71b4cb0a89ULL;
-		return BitTable[((b ^ (b-1)) * debruijn) >> 58];
-	}
-#endif
-
 // Convert index to bitboard configuration
 static inline uint64_t indexToUint64(int index, int bits, uint64_t m) {
 	uint64_t result = 0ULL;
@@ -132,6 +97,8 @@ static inline uint64_t indexToUint64(int index, int bits, uint64_t m) {
 // DOES NOT CHECK BORDERS!!!!
 #define WHITE_PAWN_ATTACKS(pawns) (NORTH_EAST(pawns) | NORTH_WEST(pawns))
 #define BLACK_PAWN_ATTACKS(pawns) (SOUTH_EAST(pawns) | SOUTH_WEST(pawns))
+
+//const uint64_t PawnAttacks[64][2];
 
 // Size of attack tables for each square
 const int RAttackSize[64] = {
@@ -834,7 +801,7 @@ static inline uint64_t getQueenAttacks(int square, uint64_t occupied) {
 }
 
 // Initialize magic bitboards
-void initMagicBitboards(void) {
+static inline void initMagicBitboards(void) {
 	int square, i;
 	uint64_t subset, index;
 
@@ -842,7 +809,7 @@ void initMagicBitboards(void) {
 	for (square = 0; square < 64; square++) {
 		RAttacks[square] = new uint64_t[RAttackSize[square]];
 		uint64_t mask = RMasks[square];
-		int bits = countOnes(mask);
+		int bits = popCount(mask);
 		int n = 1 << bits;
 
 		for (i = 0; i < n; i++) {
@@ -856,7 +823,7 @@ void initMagicBitboards(void) {
 	for (square = 0; square < 64; square++) {
 		BAttacks[square] = new uint64_t[BAttackSize[square]];
 		uint64_t mask = BMasks[square];
-		int bits = countOnes(mask);
+		int bits = popCount(mask);
 		int n = 1 << bits;
 
 		for (i = 0; i < n; i++) {
@@ -868,7 +835,7 @@ void initMagicBitboards(void) {
 }
 
 // Cleanup magic bitboard tables
-void cleanupMagicBitboards(void) {
+static inline void cleanupMagicBitboards(void) {
 	int square;
 	for (square = 0; square < 64; square++) {
 		delete[] RAttacks[square];
@@ -877,156 +844,3 @@ void cleanupMagicBitboards(void) {
 }
 
 #endif // MAGIC_BITBOARDS_H
-
-
-/**
-uint64_t getRandomUint64() {
-	uint64_t u1, u2, u3, u4;
-	u1 = (uint64_t)(random()) & 0xFFFF;
-	u2 = (uint64_t)(random()) & 0xFFFF;
-	u3 = (uint64_t)(random()) & 0xFFFF;
-	u4 = (uint64_t)(random()) & 0xFFFF;
-	return u1 | (u2 << 16) | (u3 << 32) | (u4 << 48);
-}
-
-//	Generate a sparse random 64-bit number by &'ing three random numbers
-//	creates number with fewer 1-bits, which is desirable for magic bits
-uint64_t getRandomUint64FewBits() {
-	return getRandomUint64() & getRandomUint64() & getRandomUint64();
-}
-
-// Count the number of on bits in a 64-bit number using Brian Kernighan's algorithm
-// each itr clears the least sig 1 bit.
-int countOnes(uint64_t b) {
-	int r;
-	for (r = 0; b; r++, b &= b - 1)
-		;
-	return r;
-}
-
-// generate a mask for rook moves from a given square
-// this creates a bitboard of all possible blocking squares for a rook
-uint64_t rMask(int sq) {
-	uint64_t result = 0ULL;
-	int rk = sq / 8, fl = sq % 8, r, f;
-	// generates moves for all cardinal directions except edges
-	for (r = rk + 1; r <= 6; r++)
-		result |= (1ULL << (fl + r * 8));
-	for (r = rk - 1; r >= 1; r--)
-		result |= (1ULL << (fl + r * 8));
-	for (f = fl + 1; f <= 6; f++)
-		result |= (1ULL << (fl + r * 8));
-	for (f = fl - 1; f >= 1; f--)
-		result |= (1ULL << (fl + r * 8));
-
-	return result;
-}
-
-// generate a mask for rook moves from a given square
-// this creates a bitboard of all possible blocking squares for a bishop
-uint64_t bMask(int sq) {
-	uint64_t result = 0ULL;
-	int rk = sq / 8, fl = sq % 8, r, f;
-	// Generate masks for all diagonal directions except edges
-	for (r = rk + 1, f = fl + 1; r <= 6 && f <= 6; r++, f++)
-		result |= (1ULL << (f + r * 8));
-	for (r = rk + 1, f = fl - 1; r <= 6 && f >= 1; r++, f--)
-		result |= (1ULL << (f + r * 8));
-	for (r = rk - 1, f = fl + 1; r >= 1 && f <= 6; r--, f++)
-		result |= (1ULL << (f + r * 8));
-	for (r = rk - 1, f = fl - 1; r >= 1 && f >= 1; r--, f--)
-		result |= (1ULL << (f + r * 8));
-
-	return result;
-}
-
-uint64_t findMagic(int sq, int m, int bishop) {
-	uint64_t mask, b[4049], a[4096], used[4096], magic;
-	int i, j, k, n, fail;
-
-	// get appropriate mask for the square and piece type
-	mask = bishop ? bMask(sq) : rMask(sq);
-	n = countOnes(mask);
-
-	// generate all possible blocking configs
-	for (i = 0; i < (1 << n); i++) {
-		b[i] = indexToUint64(i, n, mask);
-		a[i] = bishop ? batt(sq, b[i]) : ratt(sq, b[i]);
-	}
-
-	// try random numbers until we find a suitable magic number
-	for (k = 0; k < 100000000; k++) {
-		magic = getRandomUint64FewBits();
-		// skip if the magic number doesn't produce enough variation
-		if (countOnes((mask * magic) & 0xFF00000000000000ULL) < 6) continue;
-
-		// Test if this magic number produces unique indicies for all config.
-		for (i = 0; i < 4096; i++) {
-			used[i] = 0ULL;
-		}
-		for (i = 0, fail = 0; !fail && i < (1 << n); i++) {
-			j = transform(b[i], magic, m);
-			if (used[j] == 0ULL) { used[j] = a[i]; }
-			else if (used[j] != a[i]) { fail = 1; }
-		}
-	}
-	if (!fail) return magic;
-	Loggy.log(Logger::ERROR, "***FAILED TO CALCULATE MAGIC***");
-	return 0ULL;
-}
-
-// Number of bits needed for the magic index for Rooks on each square
-int RBits[64] = {
-	12, 11, 11, 11, 11, 11, 11, 12,
-	11, 10, 10, 10, 10, 10, 10, 11,
-	11, 10, 10, 10, 10, 10, 10, 11,
-	11, 10, 10, 10, 10, 10, 10, 11,
-	11, 10, 10, 10, 10, 10, 10, 11,
-	11, 10, 10, 10, 10, 10, 10, 11,
-	11, 10, 10, 10, 10, 10, 10, 11,
-	12, 11, 11, 11, 11, 11, 11, 12
-}
-
-// Number of bits needed for the magic index for Bishops on each square
-int BBits[64] = {
-	6, 5, 5, 5, 5, 5, 5, 6,
-	5, 5, 5, 5, 5, 5, 5, 5,
-	5, 5, 7, 7, 7, 7, 5, 5,
-	5, 5, 7, 9, 9, 7, 5, 5,
-	5, 5, 7, 9, 9, 7, 5, 5,
-	5, 5, 7, 7, 7, 7, 5, 5,
-	5, 5, 5, 5, 5, 5, 5, 5,
-	6, 5, 5, 5, 5, 5, 5, 6
-}
-
-uint64_t indexToUint64(int index, int bits, uint64_t m) {
-	int i, j;
-	uint64_t result = 0ULL;
-	for (i = 0l i < bits; i++) {
-		j = popFirstBit(&m);
-		if (index & (1 << i)) {
-			result |= (1ULL << j);
-		}
-	}
-
-	return result;
-}
-
-static inline uint64_t getRookAttacks(int square, uint64_t occupied) {
-	occupied &=  RMasks[square];
-	occupied *=  RMagic[square];
-	occupied >>= RShifts[square];
-	return RAttacks[square][occupied];
-}
-
-static inline uint64_t getBishopAttacks(int square, uint64_t occupied) {
-	occupied &=  BMasks[square];
-	occupied *=  BMagic[square];
-	occupied >>= BShifts[square];
-	return BAttacks[square][occupied];
-}
-
-static inline uint64_t getQueenAttacks(int square, uint64_t occupied) {
-	return getRookAttacks(square, occupied) | getBishopAttacks(square, occupied);
-}
- */

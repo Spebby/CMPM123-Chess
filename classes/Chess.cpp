@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include "Chess.h"
 #include "magicbitboards.h"
-#include "bitboardHelper.h"
 #include "../tools/Logger.h"
 
 #define currState _state.top()
@@ -105,7 +104,7 @@ void Chess::setUpBoard() {
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
 	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 	startGame();
-	MoveGenerator();
+	MoveGenerator(false);
 }
 
 // I'll probably have to move these into move generator so I can recursively call move generator
@@ -118,6 +117,7 @@ uint8_t pinRayBitmask;
 uint8_t friendlyKingSquare;
 uint64_t attackMap;
 const int dir[8] = {8, 1, -8, -1, 9, -7, -9, 7};
+bool generateQuiets;
 
 
 inline void ReInitGen() {
@@ -129,220 +129,369 @@ inline void ReInitGen() {
 	pinRayBitmask = 0U;
 }
 
-void Chess::CalculateAttackData() {
-	attackMap = currState.getSlidingAttackBoard();
+inline int getDirectionOffset(int a, int b) {
+    // Convert linear index a and b to (row, col)
+    int row_a = a / 8;
+    int col_a = a % 8;
+    int row_b = b / 8;
+    int col_b = b % 8;
+
+    // Calculate the differences in row and column
+    int delta_row = row_b - row_a;
+    int delta_col = col_b - col_a;
+
+    // Loop through all directions and find the match
+    for (int i = 0; i < 8; ++i) {
+        // Determine row and column change for each direction
+        int d_row = (dir[i] == 8 || dir[i] == -8 || dir[i] == 9 || dir[i] == -9) ? (dir[i] > 0 ? 1 : -1) : 0;
+        int d_col = (dir[i] == 1 || dir[i] == -1 || dir[i] == 9 || dir[i] == -9) ? (dir[i] > 0 ? 1 : -1) : 0;
+
+        // Compare delta_row and delta_col with the direction's row and column changes
+        if (delta_row == d_row && delta_col == d_col) {
+            return i; // Return the matching direction
+        }
+    }
+
+    return 0; // Return 0 if no valid direction is found
 }
 
-void Chess::MoveGenerator() {
-	// this isn't optimised the best; in the future we'll want to use bitboards instead.
-	_moves.clear();
+void Chess::CalculateAttackData() {
+	attackMap = 0ULL;
+	bool enemy = !currState.isBlackTurn();
+	// update sliding attack lanes
+	uint64_t occupancy = currState.getOccupancyBoard();
+	
+	{
+		uint64_t rooks = currState.getPieceOccupancyBoard(ChessPiece::Rook, enemy);
+		forEachBit([&](uint8_t square) {
+			attackMap |= getRookAttacks(square, occupancy);
+		}, rooks);
 
-	// reset variables.
-	ReInitGen();
-	friendlyKingSquare = currState.getEnemyKingSquare();
-	CalculateAttackData();
-	printBitboard("Attack Map", attackMap);
+		uint64_t bishops = currState.getPieceOccupancyBoard(ChessPiece::Bishop, enemy);
+		forEachBit([&](uint8_t square) {
+			attackMap |= getBishopAttacks(square, occupancy);
+		}, bishops);
 
-	// Re-determin pinned & other states.
-
-	// ================================
-	// ================================
-
-	// Only king moves valid with double check
-	if (doubleCheck) {
-		generateKingMoves(friendlyKingSquare, _grid[friendlyKingSquare], !currState.isBlackTurn());
-		return;
+		uint64_t queens = currState.getPieceOccupancyBoard(ChessPiece::Queen, enemy);
+		forEachBit([&](uint8_t square) {
+			attackMap |= getQueenAttacks(square, occupancy);
+		}, queens);
 	}
 
+	// check around king for pins
+	uint64_t kingAdjacent = KingAttacks[friendlyKingSquare];
+	ChessBit* kingBit = _grid[friendlyKingSquare].bit();
 
-	for (ChessSquare& square : _grid) {
-		// we only do half of the moves b/c we'll have to recalculate all moves next turn anyway
-		ChessBit* subject = square.bit();
-		if (!subject || subject->getOwner() != getCurrentPlayer()) continue;
-		const uint8_t	piece = subject->gameTag() & 7;
-		const bool 		black = subject->gameTag() & 8;
-		const uint8_t	index = square.getIndex();
+	forEachBit([&](uint8_t square) {
+		int direction = getDirectionOffset(friendlyKingSquare, square);
+		int n = _dist[friendlyKingSquare][direction];
+		int dirOffset = dir[direction];
+		bool friendlyBlock = false;
+		uint64_t rayMask = 0;
+		bool onDiagonal = direction > 3;
 
-		_moves[index].reserve(31);
-		int flag = 0;
-		bool pinned = isPinned(index);
+		for (int i = 0; i < n; i++) {
+			uint8_t cur = friendlyKingSquare + dirOffset * (i + 1);
+			rayMask |= 1ULL << cur;
 
-		// if there is check and piece is pinned, then no piece can move.
-		if (inCheck && pinned) {
+			ChessBit* piece = _grid[cur].bit();
+
+			if (!piece) continue;
+
+			if (piece->isAlly(kingBit)) {
+				if (!friendlyBlock) {
+					friendlyBlock = true;
+				} else {
+					break;
+				}
+
+				continue;
+			}
+
+			// Enemy piece here
+			ChessPiece pieceType = (ChessPiece)(piece->gameTag() & 7);
+			if ((onDiagonal && IsDiagonalPiece(pieceType)) || (!onDiagonal && IsHorizontalPiece(pieceType))) {
+				// Friendly piece blocks, so it is pinned
+				if (friendlyBlock) {
+					pinInPosition = true;
+					pinRayBitmask |= rayMask;
+				} else {
+					// no block, so we're in check.
+					checkRayBitmask |= rayMask;
+					// Are we in double check?
+					doubleCheck = inCheck;
+					inCheck = true;
+				}
+				break;
+			} else {
+				break;
+				// piece cannot attack king, blocking any potential pins/checks
+			}
+		}
+
+		// we don't need to search any more if we're already in doubleCheck.
+		if (doubleCheck) {
 			return;
 		}
 
-		// average number of moves per turn
-		// https://chess.stackexchange.com/questions/23135/what-is-the-average-number-of-legal-moves-per-turn#24325
+	// Since attackMap currently only has sliding data, any piece adjacent to the king that's in danger
+	// is likely to threaten the king. So we filter out rays that are obviously safe.
+	}, (kingAdjacent & attackMap));
 
-		// unless I know a value will be sent to the move constructor,
-		// i'm not going to bother making everything a uint b/c readability & highlighting
+	uint8_t enemyKingSquare = currState.getEnemyKingSquare();
 
-		// TODO: move all of these generates to helper functions, so we can better make use of bitscanning & helpers
-		switch (piece) {
-			case ChessPiece::Rook:
-				// awesome logic that'll fall through
-				if (index == 0 || index == 56) {
-					flag |= Move::FlagCodes::QCastle;
-				} else if (index == 7 || index == 63) {
-					flag |= Move::FlagCodes::KCastle;
-				}
-				[[fallthrough]];
-			case ChessPiece::Bishop:
-			case ChessPiece::Queen: {
-				// rotate around the piece and discover new spots the sliding pieces can move to.
-				int start = piece == ChessPiece::Bishop ? 4 : 0;
-				int end   = piece == ChessPiece::Rook   ? 4 : 8;
-				for (int aisle = start; aisle < end; aisle++) {
-					// if pinned, but not in check, you can move along
-					if (pinned && !isMovingAlongRay(aisle, friendlyKingSquare, index)) {
-						continue;
-					}
+	// king attacks
+	attackMap |= KingAttacks[enemyKingSquare];
 
-					for (int k = 0; k < _dist[index][aisle]; k++) {
-						uint8_t targ = index + dir[aisle] * (k + 1);
-						ChessBit* bit = _grid[targ].bit();
-
-						// blocked
-						if (square.bit()->isAlly(bit)) {
-							break;
-						} else {
-							flag |= Move::FlagCodes::Capture;
-						}
-
-						_moves[index].emplace_back(index, targ, flag);
-
-						/*
-						bool movePreventsCheck = SquareIsInCheckRay (targ);
-						if (movePreventsCheck || !inCheck) {
-							if (genQuiets || flag & 1) {
-								moves.Add (new Move (startSquare, targ));
-							}
-						}
-						// If square not empty, can't move any further in this direction
-						// Also, if this move blocked a check, further moves won't block the check
-						if (isCapture || movePreventsCheck) {
-							break;
-						}*/
-					}
-				}
-				break; }
-			case ChessPiece::Pawn: {
-				// determining if we can move two places ahead.
-				int moveDir = black ? dir[2] : dir[0];
-				bool canDPush = black ? (square.getRow() == 6) : (square.getRow() == 1);
-
-				int targ = index + moveDir;
-				bool canPromote = targ == (black ? (index % 8) : (index % 8) + 56);
-				if (!_grid[targ].bit()) {
-					if (canPromote) {
-						for (int i = 0; i < 4; i++) {
-							_moves[index].emplace_back(index, targ, Move::FlagCodes::ToQueen << i);
-						}
-					} else {
-						_moves[index].emplace_back(index, targ);
-						targ += moveDir;
-						if (canDPush && !_grid[targ].bit()) {
-							// TODO: double check this code, b/c I am VERY TIRED as I'm writing this and there is 100% an oversight here.
-							_moves[index].emplace_back(index, targ, Move::FlagCodes::DoublePush);
-						}
-					}
-				}
-			
-				targ = index + moveDir;
-				for (int dirIndex : {3, 1}) {
-					const int nTarg = targ + dir[dirIndex];
-					// First case:  is nTarg to the left of targ?
-					// Second case: is nTarg to the right of targ?
-					bool lValid = (dirIndex == 3) && (nTarg % _gameOps.X) < (targ  % _gameOps.X);
-					bool rValid = (dirIndex == 1) && (targ  % _gameOps.X) < (nTarg % _gameOps.X);
-					if (lValid || rValid) {
-						ChessBit* bit = _grid[nTarg].bit();
-						bool enPassant = currState.getEnPassantSquare() == nTarg;
-						bool capture   = bit && !bit->isAlly(square.bit());
-						// if enpassant square is specified, then we know it's a legal move b/c en passant square is set on previous turn.
-						if (enPassant || capture) {
-							// Capture + Promotion
-							if (canPromote) {
-								for (int i = 0; i < 4; i++) {
-									_moves[index].emplace_back(index, nTarg, (Move::FlagCodes::ToQueen << i) | Move::FlagCodes::Capture);
-								}
-							} else {
-								_moves[index].emplace_back(index, nTarg, Move::FlagCodes::Capture);
-							}
-						}
-					}
-				}
-				break; }
-			// for future: consider pre-calculating all possible moves for knight: procedural is fine for now.
-			case ChessPiece::Knight: {
-				const int row = square.getRow();
-				const int col = square.getColumn();
-				const int moveDirs[8][2] = {
-					{-2, -1}, {-2, 1}, {2, -1}, {2, 1},
-					{-1, -2}, {-1, 2}, {1, -2}, {1, 2}
-				};
-
-				for (const auto& move : moveDirs) {
-					const int nRow = row + move[0];
-					const int nCol = col + move[1];
-
-					if (nRow >= 0 && nRow < 8 && nCol >= 0 && nCol < 8) {
-						ChessBit* bit = _grid[nRow * 8 + nCol].bit();
-
-						// this will break if I change the flag for capturing later.
-						bool canCapture = bit && !bit->isAlly(square.bit());
-						if (!bit || canCapture) {
-							_moves[index].emplace_back(index, nRow * 8 + nCol, canCapture);
-						}
-					}
-				}
-				break; }
-			case ChessPiece::King: {
-				generateKingMoves(index, square, black);
-				break; }
-			default:
-				break;
+	// Knight Attacks
+	uint64_t knights = currState.getPieceOccupancyBoard(ChessPiece::Knight, enemy);
+	bool isKnightCheck = false;
+	forEachBit([&](uint8_t fromSquare) {
+		uint64_t attacks = KnightAttacks[fromSquare];
+		attackMap |= attacks;
+		// if knight is attacking king, update doubleCheck status.
+		if (!isKnightCheck && ((attacks & (1ULL << enemyKingSquare)) != 0)) {
+			isKnightCheck = true;
+			doubleCheck = inCheck;
+			inCheck = true;
+			checkRayBitmask |= 1ULL << fromSquare;
 		}
-	}
+	}, knights);
+
+	// Pawn Attacks
+	// TODO: pawn bitboards :(
+	/*
+	uint64_t pawns = currState.getPieceOccupancyBoard(ChessPiece::Pawn, enemy);
+	bool isPawnCheck = false;
+	forEachBit([&](uint8_t fromSquare) {
+		// pawn attacks
+		;
+	}, pawns);*/
+
+	// TODO: add check to attack map for potential checks after enpassant
+
+	Loggy.log(Logger::WARNING, std::to_string(attackMap));
 }
 
-void Chess::generateKingMoves(int index, ChessSquare& square, bool black) {
-	// TODO: add check on castling to see if in danger.
-	// due to us pre-calculating dangerous squares, we can simply & the bits and see if they're non-zero.
-	for (int i = 0; i < 8; i++) {
-		if (_dist[index][i] < 1) continue;
-		int targ = index + dir[i];
-		ChessBit* bit = _grid[targ].bit();
+void Chess::MoveGenerator(bool capturesOnly) {
+	// this isn't optimised the best; in the future we'll want to use bitboards instead.
+	_moves.clear();
 
-		if (bit) {
-			if (bit->isAlly(square.bit())) {
-				continue;
+	generateQuiets = !capturesOnly;
+
+	// reset variables.
+	ReInitGen();
+	friendlyKingSquare = currState.getFriendlyKingSquare();
+	CalculateAttackData();
+
+	GenerateKingMoves();
+
+	if (doubleCheck) {
+		return;
+	}
+
+	GeneratePawnMoves();
+	GenerateKnightMoves();
+
+	GenerateBishopMoves();
+	GenerateRookMoves();
+	GenerateQueenMoves();
+}
+
+void Chess::GeneratePawnMoves() {
+	bool black = currState.isBlackTurn();
+	uint64_t pawns = currState.getPieceOccupancyBoard(ChessPiece::Pawn, black);
+	const uint64_t occupancy = currState.getOccupancyBoard();
+	const uint64_t enemies   = currState.getEnemyOccuupancyBoard();
+	const uint64_t friends   = currState.getFriendlyOccuupancyBoard();
+
+	forEachBit([&](uint8_t fromSquare) {
+		int moveDir = black ? dir[2] : dir[0];
+		bool canDPush = black ? ((fromSquare / 8) == 6) : ((fromSquare / 8) == 1);
+
+		uint8_t toSquare = fromSquare + moveDir;
+		bool canPromote = toSquare == (black ? (fromSquare % 8) : (fromSquare % 8) + 56);
+		if (((friends & (1ULL << fromSquare)) != 0)) {
+			if (canPromote) {
+				for (int i = 0; i < 4; i++) {
+					_moves[fromSquare].emplace_back(fromSquare, toSquare, Move::FlagCodes::ToQueen << i);
+				}
 			} else {
-				_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling | Move::FlagCodes::Capture);
-				continue;
+				_moves[fromSquare].emplace_back(fromSquare, toSquare);
+				toSquare += moveDir;
+				if (canDPush && ((friends & (1ULL << fromSquare)) != 0)) {
+					// TODO: double check this code, b/c I am VERY TIRED as I'm writing this and there is 100% an oversight here.
+					_moves[fromSquare].emplace_back(fromSquare, toSquare, Move::FlagCodes::DoublePush);
+				}
 			}
 		}
-		_moves[index].emplace_back(index, targ, Move::FlagCodes::Castling);
-	}
+
+		toSquare = fromSquare + moveDir;
+		for (int dirIndex : {3, 1}) {
+			const int nTarg = toSquare + dir[dirIndex];
+			// First case:  is nTarg to the left of targ?
+			// Second case: is nTarg to the right of targ?
+			bool lValid = (dirIndex == 3) && (nTarg % _gameOps.X) < (toSquare  % _gameOps.X);
+			bool rValid = (dirIndex == 1) && (toSquare  % _gameOps.X) < (nTarg % _gameOps.X);
+			if (lValid || rValid) {
+				bool enPassant = currState.getEnPassantSquare() == nTarg;
+				bool capture   = ((1ULL << toSquare) & enemies) != 0;
+				// if enpassant square is specified, then we know it's a legal move b/c en passant square is set on previous turn.
+				if (enPassant || capture) {
+					_moves[fromSquare].emplace_back(fromSquare, nTarg, Move::FlagCodes::Capture);
+				}
+			}
+		}
+	}, pawns);
+}
+
+void Chess::GenerateKnightMoves() {
+	uint64_t knights = currState.getPieceOccupancyBoard(ChessPiece::Knight, currState.isBlackTurn());
+	const uint64_t occupancy = currState.getOccupancyBoard();
+	const uint64_t enemies   = currState.getEnemyOccuupancyBoard();
+	const uint64_t friends   = currState.getFriendlyOccuupancyBoard();
+
+	forEachBit([&](uint8_t fromSquare) {
+		if (inCheck && isPinned(fromSquare));
+
+		uint64_t attacks = KnightAttacks[fromSquare];
+		attacks &= ~friends;
+		_moves[fromSquare].reserve(popCount(attacks));
+		forEachBit([&](uint8_t toSquare) {
+			bool capture = ((1ULL << toSquare) & enemies) != 0;
+			// if generating only captures, or this is not a blocking move while in check, break.
+			if ((inCheck && !squareIsInCheckRay(toSquare))) return;
+			// skip if in check & knight is not going to block/capture attacking piece
+			uint16_t flags = capture ? Move::FlagCodes::Capture : 0;
+			_moves[fromSquare].emplace_back(fromSquare, toSquare, flags);
+		}, attacks);
+	}, knights);
+}
+
+void Chess::GenerateBishopMoves() {
+	uint64_t bishops = currState.getPieceOccupancyBoard(ChessPiece::Bishop, currState.isBlackTurn());
+	const uint64_t occupancy = currState.getOccupancyBoard();
+	const uint64_t enemies   = currState.getEnemyOccuupancyBoard();
+	const uint64_t friends   = currState.getFriendlyOccuupancyBoard();
+
+	forEachBit([&](uint8_t fromSquare) {
+		if (inCheck && isPinned(fromSquare));
+		uint64_t attacks = getBishopAttacks(fromSquare, occupancy);
+		attacks &= ~friends;
+		_moves[fromSquare].reserve(popCount(attacks));
+
+		forEachBit([&](uint8_t toSquare) {
+			uint16_t flags = ((1ULL << toSquare) & enemies) ? Move::FlagCodes::Capture : 0;
+			_moves[fromSquare].emplace_back(fromSquare, toSquare, flags);
+		}, attacks);
+	}, bishops);
+}
+
+void Chess::GenerateRookMoves() {
+	// may be good to handle this in GameState rather than here or do a helper.
+	uint64_t rooks = currState.getPieceOccupancyBoard(ChessPiece::Rook, currState.isBlackTurn());
+	const uint64_t occupancy = currState.getOccupancyBoard();
+	const uint64_t enemies   = currState.getEnemyOccuupancyBoard();
+	const uint64_t friends   = currState.getFriendlyOccuupancyBoard();
+
+	forEachBit([&](uint8_t fromSquare) {
+		if (inCheck && isPinned(fromSquare));
+
+		uint16_t flags = 0;
+		if        (fromSquare == 0 || fromSquare == 56) {
+			flags |= Move::FlagCodes::QCastle;
+		} else if (fromSquare == 7 || fromSquare == 63) {
+			flags |= Move::FlagCodes::KCastle;
+		}
+
+		uint64_t attacks = getRookAttacks(fromSquare, occupancy);
+		attacks &= ~friends;
+		_moves[fromSquare].reserve(popCount(attacks));
+
+		forEachBit([&](uint8_t toSquare) {
+			flags |= ((1ULL << toSquare) & enemies) ? Move::FlagCodes::Capture : 0;
+			_moves[fromSquare].emplace_back(fromSquare, toSquare, flags);
+		}, attacks);
+	}, rooks);
+}
+
+void Chess::GenerateQueenMoves() {
+		// may be good to handle this in GameState rather than here or do a helper.
+	uint64_t queens = currState.getPieceOccupancyBoard(ChessPiece::Queen, currState.isBlackTurn());
+	const uint64_t occupancy = currState.getOccupancyBoard();
+	const uint64_t enemies   = currState.getEnemyOccuupancyBoard();
+	const uint64_t friends   = currState.getFriendlyOccuupancyBoard();
+
+	forEachBit([&](uint8_t fromSquare) {
+		if (inCheck && isPinned(fromSquare));
+		uint64_t attacks = getQueenAttacks(fromSquare, occupancy);
+		attacks &= ~friends;
+		_moves[fromSquare].reserve(popCount(attacks));
+
+		forEachBit([&](uint8_t toSquare) {
+			uint16_t flags = ((1ULL << toSquare) & enemies) ? Move::FlagCodes::Capture : 0;
+			_moves[fromSquare].emplace_back(fromSquare, toSquare, flags);
+		}, attacks);
+	}, queens);
+}
+
+void Chess::GenerateKingMoves() {
+	bool black = currState.isBlackTurn();
+	ChessSquare square = _grid[friendlyKingSquare];
+
+	const uint64_t occupancy = currState.getOccupancyBoard();
+	const uint64_t enemies   = currState.getEnemyOccuupancyBoard();
+	const uint64_t friends   = currState.getFriendlyOccuupancyBoard();
 
 	uint8_t rights = currState.getCastlingRights();
-	// Queenside
-	if ((rights & black ? 0b0100 : 0b0001) != 0) {
-		if (!_grid[index - 1].bit() && !_grid[index - 2].bit() && !_grid[index - 3].bit()) {
-			_moves[index].emplace_back(index, index - 2, Move::FlagCodes::QCastle);
+
+	uint64_t map = KingAttacks[friendlyKingSquare];
+	forEachBit([&](uint8_t toSquare) {
+		// skip friendly squares
+		if (friends & (1ULL << toSquare)) return;
+
+		bool capture = (enemies & (1ULL << toSquare));
+		uint16_t flags = capture ? Move::FlagCodes::Capture : 0;
+		flags |= Move::FlagCodes::Castling;
+
+		// If this is not a capture...
+		if (!capture) {
+			// Can't go to dangerous square unless is capturing that piece
+			// TODO: skip if not generating quiet moves
+			if(squareIsInCheckRay(toSquare)) {
+				return;
+			}
 		}
-	}
-	// Kingside
-	if ((rights & black ? 0b1000 : 0b0010) != 0) {
-		if (!_grid[index + 1].bit() && !_grid[index + 2].bit()) {
-			_moves[index].emplace_back(index, index + 2, Move::FlagCodes::KCastle);
+
+		// This space is safe for the king to move to
+		if (!(attackMap & (1ULL << toSquare))) {
+			_moves[friendlyKingSquare].emplace_back(friendlyKingSquare, toSquare, flags);
+
+			// castling
+			if (!inCheck && !capture) {
+				// KingSide, f1, f8
+				if (((toSquare == 5) || (toSquare == 61)) && ((rights & black ? 0b0100 : 0b0001) != 0)) {
+					uint64_t mask = 0b01100000;
+					uint8_t castleSquare = toSquare + 1;
+					if (((attackMap & mask) != 0) && ((occupancy & mask) != 0)) {
+						_moves[friendlyKingSquare].emplace_back(friendlyKingSquare, castleSquare, flags);
+					}
+				// QueenSide, d1, d8
+				} else if (((toSquare == 3) || (toSquare == 59)) && ((rights & black ? 0b1000 : 0b0010) != 0)) {
+					uint64_t mask = 0b0111;
+					uint8_t castleSquare = toSquare - 1;
+					if (((attackMap & mask) != 0) && ((occupancy & mask) != 0)) {
+						_moves[friendlyKingSquare].emplace_back(friendlyKingSquare, castleSquare, flags);
+					}
+				}
+			}
 		}
-	}
+
+	}, map);
 }
 
 bool Chess::isPinned(int index) {
-	return false;
+	return pinInPosition && ((pinRayBitmask >> index) & 1) != 0;
 }
 
 bool Chess::isMovingAlongRay(int asile, int startSquare, int targetSquare) {
@@ -350,6 +499,7 @@ bool Chess::isMovingAlongRay(int asile, int startSquare, int targetSquare) {
 	return (asile == moveDir || -asile == moveDir);
 }
 
+// Helper for checking 
 bool Chess::squareIsInCheckRay(int square) {
 	return inCheck && ((checkRayBitmask >> square) & 1) != 0;
 }
@@ -374,7 +524,7 @@ bool Chess::canBitMoveFrom(Bit& bit, BitHolder& src) {
 			uint8_t attacking = move.getTo();
 			_grid[attacking].setMoveHighlighted(true);
 			_litSquare.push(&_grid[attacking]);
-			Loggy.log("Pushed to lit: " + std::to_string(attacking));
+			//Loggy.log("Pushed to lit: " + std::to_string(attacking));
 		}
 	}
 	return canMove;
@@ -496,7 +646,7 @@ std::string Chess::initialStateString() {
 // we will read the state string and store it in each turn object
 std::string Chess::stateString() {
 	std::string s;
-	uint8_t emptyCount;
+	int emptyCount = 0;
 
 	int file = 7, rank = 0;
 	for (int i = 0; i < _gameOps.size; i++) {

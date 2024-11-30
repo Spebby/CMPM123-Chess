@@ -71,7 +71,7 @@ add_executable(Chess ${SOURCES})
 target_sources(Chess PRIVATE
     classes/ChessPiece.h
     classes/magicbitboards.h
-    classes/bitboardHelper.h
+    classes/BitFunctions.h
 )
 
 # Link libraries based on the platform
