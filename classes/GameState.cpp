@@ -1,8 +1,6 @@
 #include <cstring>
-
 #include "GameState.h"
 #include "../tools/Logger.h"
-#include "magicbitboards.h"
 
 const uint8_t MAX_DEPTH = 24; // for AI purposes
 // Generate from FEN
@@ -29,8 +27,8 @@ GameState::GameState(const GameState& old, const Move& move)
 	enPassantSquare(move.isDoublePush() ? (move.getTo() + (isBlack ? -8 : 8)) : 255), // 255 b/c not a value normally reachable in gameplay
 	halfClock(move.isCapture() ? 0 : old.halfClock + 1),
 	clock(old.clock + 1),
+	friendlyKingSquare(old.enemyKingSquare),
 	enemyKingSquare(old.friendlyKingSquare) {
-
 	// don't have to guard against 0 here b/c move.getFrom() will always be a piece.
 	ChessPiece piece = bits.PieceFromIndex(move.getFrom());
 	bits.enable(piece, move.getTo());

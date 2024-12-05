@@ -53,10 +53,11 @@ private:
 	inline void 	clearPositionHighlights();
 
 	void GeneratePawnMoves();
+	inline void GeneratePawnPush(const uint64_t, const uint8_t);
+	inline void GeneratePawnAttack(const uint64_t, const uint8_t); // helper
 	void GenerateKnightMoves();
-	void GenerateBishopMoves();
-	void GenerateRookMoves();
-	void GenerateQueenMoves();
+	void GenerateSlidingMoves();
+	inline void GenerateSlidingMovesHelper(const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
 	void GenerateKingMoves();
 
 	void CalculateAttackData();

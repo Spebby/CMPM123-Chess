@@ -6,7 +6,7 @@ static inline uint8_t bitScanForward(uint64_t bb) {
 #if defined(_MSC_VER) && !defined(__clang__)
     unsigned long index;
     _BitScanForward64(&index, bb);
-    return index;
+    return static_cast<uint8_t>(index);
 #else
     return __builtin_ffsll(bb) - 1;
 #endif
@@ -27,7 +27,7 @@ static inline uint8_t bitScanForward(uint64_t bb) {
 #elif defined(_MSC_VER)
     #include <intrin.h>
     static inline int popCount(uint64_t b) {
-        return __popcnt64(b);
+        return static_cast<int>(__popcnt64(b));
     }
 
     // Find first set bit (returns 0-63, undefined for b==0)

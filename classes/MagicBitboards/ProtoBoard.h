@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
-#include "ChessPiece.h"
+#include "../ChessPiece.h"
 
 class ProtoBoard {
     public:

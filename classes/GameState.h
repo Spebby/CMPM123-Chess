@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "ProtoBoard.h"
+#include "MagicBitboards/ProtoBoard.h"
 #include "Move.h"
 
 class GameState {

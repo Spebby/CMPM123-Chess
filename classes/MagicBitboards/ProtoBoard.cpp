@@ -2,7 +2,7 @@
 // I use some bitscanning to efficiently extract data from bitboards.
 #include <cstring>
 #include "ProtoBoard.h"
-#include "magicbitboards.h"
+#include "BitFunctions.h"
 
 ProtoBoard::ProtoBoard() {
     std::memset(bits, 0, sizeof(bits));
