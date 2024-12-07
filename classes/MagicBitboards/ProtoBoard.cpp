@@ -62,13 +62,7 @@ ChessPiece ProtoBoard::PieceFromIndex(uint8_t index) const {
 
     for (int i = 0; i < 12; i++) {
         if ((bits[i] & mask) != 0) {
-            if (i < 6) {
-                return (ChessPiece)(i + 1);
-                // 1 - 6 for white pieces
-            } else {
-                return (ChessPiece)(i + 3);
-                // 9 - 14 for black pieces
-            }
+            return PieceFromProtoIndex(i);
         }
     }
 

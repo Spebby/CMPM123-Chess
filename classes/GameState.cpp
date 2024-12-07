@@ -28,28 +28,40 @@ GameState::GameState(const GameState& old, const Move& move)
 	halfClock(move.isCapture() ? 0 : old.halfClock + 1),
 	clock(old.clock + 1),
 	friendlyKingSquare(old.enemyKingSquare),
-	enemyKingSquare(old.friendlyKingSquare) {
-	// don't have to guard against 0 here b/c move.getFrom() will always be a piece.
-	ChessPiece piece = bits.PieceFromIndex(move.getFrom());
-	bits.enable(piece, move.getTo());
-	bits.disable(piece, move.getFrom());
+	enemyKingSquare(old.friendlyKingSquare)
+	{
+
+	uint8_t from = move.getFrom();
+	uint8_t to   = move.getTo();
+	// don't have to guard against 0 here b/c from will always be a piece.
+	ChessPiece piece = bits.PieceFromIndex(from);
+	bits.enable(piece, to);
+	bits.disable(piece, from);
 
 	//std::memcpy(state, old.state, sizeof(state));
-	//char movingPiece = state[move.getFrom()];
-	//state[move.getTo()] = movingPiece;
-	//state[move.getFrom()] = '0';
+	//char movingPiece = state[from];
+	//state[to] = movingPiece;
+	//state[from] = '0';
 
 	if ((piece & 7) == ChessPiece::King) {
-		friendlyKingSquare = move.getTo();
+		friendlyKingSquare = to;
 	}
 
-	if (move.getTo() == old.enPassantSquare) { // did en passant happen
-		uint8_t offset = piece & 8 ? (move.getTo() + 8) : move.getTo() - 8;
+	if (to == old.enPassantSquare) { // did en passant happen
+		uint8_t offset = piece & 8 ? (to + 8) : to - 8;
 		bits.disable((ChessPiece)(piece ^ (1U << 3)), offset);
-		//state[movingPiece == 'P' ? (move.getTo() - 8) : (move.getTo() + 8)] = '0';
+		//state[movingPiece == 'P' ? (to - 8) : (to + 8)] = '0';
 	} else if (move.isCapture()) {
-		ChessPiece target = old.bits.PieceFromIndex(move.getTo());
-		bits.disable(target, move.getTo());
+		ChessPiece target = old.bits.PieceFromIndex(to);
+		bits.disable(target, to);
+
+
+		// update castling rights if a rook was taken
+		if (to == 56 || to == 0) {
+			castlingRights &= isBlackTurn() ? ~0b0001 : ~0b0100;
+		} else if (to == 63 || to == 7) {
+			castlingRights &= isBlackTurn() ? ~0b0010 : ~0b1000;
+		}
 	} else if (move.isCastle()) {
 		uint8_t offset = isBlack ? 56 : 0;
 		uint8_t rookSpot = move.QueenSideCastle() ? 0 : 7 + offset;
@@ -77,9 +89,9 @@ GameState::GameState(const GameState& old, const Move& move)
 				newPiece = ChessPiece::Bishop;
 				break;
 		}
-		bits.enable((ChessPiece)(newPiece | (isBlack << 3)), move.getTo());
+		bits.enable((ChessPiece)(newPiece | (isBlack << 3)), to);
 		//newPiece += isBlack ? 32 : 0;
-		//state[move.getTo()] = newPiece;
+		//state[to] = newPiece;
 	}
 }
 

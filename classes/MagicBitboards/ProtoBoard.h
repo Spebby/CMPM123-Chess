@@ -70,6 +70,16 @@ class ProtoBoard {
     std::vector<uint8_t> getBitPositions(ChessPiece piece) const;
     ChessPiece PieceFromIndex(uint8_t index) const;
 
+    static inline ChessPiece PieceFromProtoIndex(int i) {
+        if (i < 6) {
+            return (ChessPiece)(i + 1);
+            // 1 - 6 for white pieces
+        }
+
+        return (ChessPiece)(i + 3);
+        // 9 - 14 for black pieces
+    }
+
     private:
     inline int pieceToBoard(ChessPiece piece, bool isBlack) const {
         return isBlack ? (piece + 5) : piece - 1;
