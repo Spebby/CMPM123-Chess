@@ -55,14 +55,17 @@ class ProtoBoard {
 
     // GameTag versions
     inline void set(const ChessPiece piece, const uint64_t board) {
+        if (piece == NoPiece) return;
         bits[pieceToBoard(piece)] = board;
     }
 
     inline void enable(const ChessPiece piece, const int pos) {
+        if (piece == NoPiece) return;
         bits[pieceToBoard(piece)] |=  (1ULL << pos);
     }
 
     inline void disable(const ChessPiece piece, const int pos) {
+        if (piece == NoPiece) return;
         bits[pieceToBoard(piece)] &= ~(1ULL << pos);
     }
 

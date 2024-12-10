@@ -12,9 +12,8 @@ const uint8_t squareMask = 63U;
 class Move {
 	public:
 	enum FlagCodes {
-		// don't need to keep track of EnPassant b/c Double Push already tracks that
 		// I included some flags in here for convenience later.
-		Capture    = 0b00000001,
+		EnCapture  = 0b00000001,
 		DoublePush = 0b00000010,
 		Castling   = 0b00001100,
 		QCastle    = 0b00000100,
@@ -27,8 +26,8 @@ class Move {
 		// not checking
 	};
 
-	Move(uint8_t, uint8_t);
-	Move(uint8_t, uint8_t, uint8_t);
+	Move(uint8_t from, uint8_t to);
+	Move(uint8_t from, uint8_t to, uint8_t flags);
 	Move(const Move& other) : move(other.move) {}
 
 	Move& operator=(const Move&);
@@ -49,8 +48,12 @@ class Move {
 	void toggleFlags(uint8_t);
 
 	// really wish C++ had C# styled lambdas right now
-	bool isCapture()		const { return (getFlags() &  FlagCodes::Capture)		!= 0; }
-	bool isQuiet()			const { return (getFlags() & ~FlagCodes::Capture)		!= 0; }
+
+	// NOTE: The convenience of checking if a captured happened was outweighed by unmaking enpassant
+	// I can't store both with the current flag size limit, and if enpassant had happened was impossible to
+	// determine dynamically, where as a regular capture is.
+	bool isEnCapture()		const { return (getFlags() &  FlagCodes::EnCapture)		!= 0; }
+	//bool isQuiet()			const { return (getFlags() & ~FlagCodes::Capture)		!= 0; }
 	bool isDoublePush()		const { return (getFlags() &  FlagCodes::DoublePush)	!= 0; }
 	bool isPromotion()		const { return (getFlags() &  FlagCodes::Promotion)		!= 0; }
 	bool KingSideCastle()	const { return (getFlags() &  FlagCodes::KCastle)		!= 0; }

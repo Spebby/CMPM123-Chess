@@ -57,7 +57,8 @@ std::vector<uint8_t> ProtoBoard::getBitPositions(ChessPiece piece) const {
     return pos;
 }
 
-ChessPiece ProtoBoard::PieceFromIndex(uint8_t index) const {
+// Micro Optimisation: Consider ordering it to check WPawn, BPawn, WKnight, BKnight.. etc first.
+ChessPiece ProtoBoard::PieceFromIndex(const uint8_t index) const {
     uint64_t mask = (1ULL << index);
 
     for (int i = 0; i < 12; i++) {

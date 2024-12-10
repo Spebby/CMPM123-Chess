@@ -1,13 +1,14 @@
 #pragma once
 
-enum ChessPiece {
+enum ChessPiece : uint8_t {
 	NoPiece	= 0,
 	Pawn	= 1,
 	Knight	= 2,
 	Bishop	= 3,
 	Rook	= 4,
 	Queen	= 5,
-	King	= 6
+	King	= 6,
+	Black   = 1ULL << 3
 };
 
 enum BitMasks : uint64_t {

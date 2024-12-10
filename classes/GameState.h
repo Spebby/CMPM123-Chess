@@ -5,6 +5,10 @@
 #include "MagicBitboards/ProtoBoard.h"
 #include "Move.h"
 
+// TODO read these
+// https://www.chessprogramming.org/Repetitions
+// http://www.open-chess.org/viewtopic.php?f=3&t=2209
+
 class GameState {
 	public:
 	// Generate from FEN
@@ -17,8 +21,23 @@ class GameState {
 
 	GameState(const GameState& old);
 
-	GameState& operator=(const GameState& other);
-	bool operator==(const GameState& other);
+	GameState& operator=(const GameState&);
+	bool operator==(const GameState&);
+
+	void MakeMove(const Move&);
+	void UnmakeMove(const Move&);
+	// TODO: We're going to need to figure out a proper way to restore
+	// TODO: rights when unmaking, since keeping track of castling rights is pretty
+	// TODO: important, same w/ half clock.
+
+	// this is really funny so i will be using this syntax
+	void operator+(const Move& move) {
+		MakeMove(move);
+	}
+
+	void operator-(const Move& move) {
+		UnmakeMove(move);
+	}
 
 	bool isBlackTurn() const { return isBlack; }
 	uint8_t getEnPassantSquare()	const { return enPassantSquare; }
@@ -28,12 +47,11 @@ class GameState {
 	void setCastlingRights(const uint8_t rights) { castlingRights = rights; }
 	// consider not allowing direct access to protoboard
 	ProtoBoard& getProtoBoard() { return bits; }
-	//const char* getState() const { return state; }
 
 	uint8_t getEnemyKingSquare()    const { return enemyKingSquare; }
 	uint8_t getFriendlyKingSquare() const { return friendlyKingSquare; }
 
-	//uint64_t getSlidingAttackBoard() const;
+	ChessPiece PieceFromIndex(const uint8_t index) const { return bits.PieceFromIndex(index); }
 
 	uint64_t getOccupancyBoard() const { return bits.getOccupancyBoard(); }
 	uint64_t getFriendlyOccuupancyBoard() const { return isBlack ? bits.getBlackOccupancyBoard() : bits.getWhiteOccupancyBoard(); }
@@ -41,7 +59,7 @@ class GameState {
 
 	const uint64_t& getPieceOccupancyBoard(ChessPiece piece, bool isBlack) const { return bits[isBlack ? (piece + 5) : piece - 1]; }
 
-	// TODO: init state w/ proper values. For later!
+	int evaluateBoard() const;
 
 	protected:
 	// I wanted a class that managed muh bits a bit nicer than a c-string, and one that
@@ -56,11 +74,5 @@ class GameState {
 	//const uint64_t hash;
 	uint8_t friendlyKingSquare : 6;
 	uint8_t enemyKingSquare : 6;
-
-	//char state[64];
-
-	// TODO: add a way of tracking board state (graeme recommends a 64 bit char array)
-
-	// if i want to support undoing, it may be a good idea to add a string to these (or an associated class) that keeps track
-	// of FEN so I can reload from FEN.
+	ChessPiece capturedPieceType;
 };

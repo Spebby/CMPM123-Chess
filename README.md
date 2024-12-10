@@ -69,11 +69,11 @@ make
 ### Planned Features
 - [✓] Support for En Passant and Castling
 - [ ] AI move generation
-- [ ] Position evaluation
+- [✓] Position evaluation
 - [ ] Opening book integration
 - [ ] Advanced search algorithms
 - [ ] Game state persistence
-- [ ] Rudimentary Bitboards
+- [✓] Rudimentary Bitboards
 
 ## 🔍 Code Examples
 
@@ -181,6 +181,7 @@ Representing a move internally is a tricky balance. Moving to and from a spot ca
 - Implement special moves (castling, en passant)
 
 ### Phase 3: AI Implementation
+- Illegal Move filtering
 - Develop position evaluation
 - Implement minimax algorithm
 - Add alpha-beta pruning

@@ -50,6 +50,7 @@ set(SOURCES
 	imgui/imgui_widgets.cpp
 	imgui/imgui.cpp
 	imgui/imgui_impl_opengl3.cpp
+    classes/ChessAI.cpp
     classes/MagicBitboards/MagicBitboards.cpp
     classes/Move.cpp
     classes/MagicBitboards/ProtoBoard.cpp
@@ -71,7 +72,9 @@ add_executable(Chess ${SOURCES})
 # headers used to make IDEs not scream at me.
 target_sources(Chess PRIVATE
     classes/ChessPiece.h
+    classes/PrecomputedData.h
     classes/MagicBitboards/BitFunctions.h
+    classes/MagicBitboards/EvaluationTables.h
 )
 
 # Link libraries based on the platform

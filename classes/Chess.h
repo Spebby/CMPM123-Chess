@@ -9,6 +9,8 @@
 #include "GameState.h"
 #include "ChessPiece.h"
 
+typedef std::unordered_map<uint8_t, std::vector<Move>> MoveTable;
+
 // the main game class
 class Chess : public Game {
 public:
@@ -18,6 +20,7 @@ public:
 	// set up the board
 	void		setUpBoard() override;
 
+	void		endTurn() override;
 	Player*		checkForWinner() override;
 	bool		checkForDraw() override;
 	std::string	initialStateString() override;
@@ -28,11 +31,10 @@ public:
 	bool		canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) override;
 	void		bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
 
-	void MoveGenerator(bool=false);
-	bool isPinned(int);
-	bool isMovingAlongRay(int, int, int);
-	bool squareIsInCheckRay(int);
-
+	static MoveTable MoveGenerator(GameState&, bool=false);
+	static bool isPinned(int);
+	static bool isMovingAlongRay(int, int, int);
+	static bool squareIsInCheckRay(int);
 
 	void		stopGame() override;
 	BitHolder&	getHolderAt(const int x, const int y) override { return _grid[y * 8 + x]; }
@@ -41,7 +43,7 @@ public:
 	bool		gameHasAI() override { return false; }
 
 	// we only use this in application.cpp for debugging purposes
-	std::unordered_map<uint8_t, std::vector<Move>> getMoves() const { return _moves; }
+	MoveTable getMoves() const { return _playerMoves; }
 	GameState getState() const { return _state.top(); }
 
 private:
@@ -52,21 +54,23 @@ private:
     const char		bitToPieceNotation(int i) const;
 	inline void 	clearPositionHighlights();
 
-	void GeneratePawnMoves();
-	inline void GeneratePawnPush(const uint64_t, const uint8_t);
-	inline void GeneratePawnAttack(const uint64_t, const uint8_t); // helper
-	void GenerateKnightMoves();
-	void GenerateSlidingMoves();
-	inline void GenerateSlidingMovesHelper(const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
-	void GenerateKingMoves();
+	static void CalculateAttackData(GameState&);
+	static void GeneratePawnMoves(MoveTable&, GameState&);
+	static inline void GeneratePawnPush(MoveTable&,   GameState&, const uint64_t, const uint8_t);
+	static inline void GeneratePawnAttack(MoveTable&, GameState&, const uint64_t, const uint8_t); // helper
+	static void GenerateKnightMoves(MoveTable&,  GameState&);
+	static void GenerateSlidingMoves(MoveTable&, GameState&);
+	static inline void GenerateSlidingMovesHelper(MoveTable&, const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
+	static void GenerateKingMoves(MoveTable&, GameState&);
 
-	void CalculateAttackData();
+	static bool draw(const MoveTable&, bool);
 
-	// distances at a given position to the board's boundries. North, East, South, West, NE, SE, SW, NW
-	int _dist[64][8];
 	ChessSquare	_grid[64];
-	std::unordered_map<uint8_t, std::vector<Move>> _moves;
 	std::stack<GameState> _state;
+
+	// the non-AI player's moves. We cache this as our agnostic backend can't be modified to support passing a move list
+	// directly (nor should it). For player turns specifically, the engine running at 100% efficientcy is overkill.
+	MoveTable _playerMoves;
 	// I don't need to use a stack, a vector would be perfectly fine, but a stack is syntactically simpler.
 	std::stack<ChessSquare*> _litSquare;
 };
