@@ -89,16 +89,22 @@ void Chess::setUpBoard() {
 	}
 
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
-	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    //setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");  // checkmate check
-    // setStateString("5k2/8/8/3q4/8/8/5PPP/7K"); endTurn(); // debug checkmate, black checkmate in one
-    // setStateString("6k1/1P3ppp/8/8/8/8/8/4K3"); // check pawn promotion
-    // setStateString("r1bq1rk1/p3bppp/2q2n2/4p3/2B1P3/2N1BQ2/PPP3PP/R3K2R");        // can king castle on queen side with square under attack
-    // setStateString("r1bqkbnr/ppp2ppp/2n5/3pQ3/8/5N1P/PPP1PPP1/RNBQKB1R"); // black in check
-    // setStateString("Q7/3k4/5K1p/5PpP/6P1/8/8/8"); // white to move but makes illegal move
-    // setStateString("5k2/2R5/8/3Q3p/3p4/3P1K2/4P3/8"); // white can checkmate
-    // setStateString("r1bn3r/pp3ppp/5k2/q1pP4/2N5/P1QB4/1Q3PPP/R3K2R"); // didn't see check
-    // setStateString("r3k1r1/pp1N1ppp/2n1pq2/1B6/3QP3/8/P2Q1PPP/R3K2R"); // didn't see check
+	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
+    // setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");				// checkmate check
+    // setStateString("5k2/8/8/3q4/8/8/5PPP/7K"); endTurn(); 						// debug checkmate, black checkmate in one
+    // setStateString("6k1/1P3ppp/8/8/8/8/8/4K3");									// check pawn promotion
+    // setStateString("r1bq1rk1/p3bppp/2q2n2/4p3/2B1P3/2N1BQ2/PPP3PP/R3K2R");		// can king castle on queen side with square under attack
+    // setStateString("r1bqkbnr/ppp2ppp/2n5/3pQ3/8/5N1P/PPP1PPP1/RNBQKB1R");		// black in check
+    // setStateString("Q7/3k4/5K1p/5PpP/6P1/8/8/8");								// white to move but makes illegal move
+    // setStateString("5k2/2R5/8/3Q3p/3p4/3P1K2/4P3/8");							// white can checkmate
+    // setStateString("r1bn3r/pp3ppp/5k2/q1pP4/2N5/P1QB4/1Q3PPP/R3K2R");			// didn't see check
+    // setStateString("r3k1r1/pp1N1ppp/2n1pq2/1B6/3QP3/8/P2Q1PPP/R3K2R");			// didn't see check
+	// setStateString("k7/8/8/8/2Q5/8/3K4/2r5"); // Rook Check Sanity Check
+	// setStateString("k7/8/8/8/2Q5/8/3K4/2b5"); // Bishop Check Sanity Check
+
+	// Great website for generating test cases
+	// http://www.netreal.de/Forsyth-Edwards-Notation/index.php
+
 	startGame();
 	_playerMoves = MoveGenerator(currState, false);
 }
@@ -192,29 +198,37 @@ void Chess::CalculateAttackData(GameState& state) {
 	bool blackIsEnemy = !state.isBlackTurn();
 	// update sliding attack lanes
 	uint64_t occupancy = state.getOccupancyBoard();
-	
+	uint64_t sliderBoard;
+
 	{
+		uint64_t blockers = occupancy ^ (1ULL << friendlyKingSquare);
 		uint64_t rooks = state.getPieceOccupancyBoard(ChessPiece::Rook, blackIsEnemy);
+		sliderBoard |= rooks;
 		forEachBit([&](uint8_t square) {
-			attackMap |= getRookAttacks(square, occupancy);
+			attackMap |= getRookAttacks(square, blockers);
 		}, rooks);
 
 		uint64_t bishops = state.getPieceOccupancyBoard(ChessPiece::Bishop, blackIsEnemy);
+		sliderBoard |= bishops;
 		forEachBit([&](uint8_t square) {
-			attackMap |= getBishopAttacks(square, occupancy);
+			attackMap |= getBishopAttacks(square, blockers);
 		}, bishops);
 
 		uint64_t queens = state.getPieceOccupancyBoard(ChessPiece::Queen, blackIsEnemy);
+		sliderBoard |= queens;
 		forEachBit([&](uint8_t square) {
-			attackMap |= getQueenAttacks(square, occupancy);
+			attackMap |= getQueenAttacks(square, blockers);
 		}, queens);
 	}
 	Loggy.log(Logger::WARNING, "Sliding Step - " + std::to_string(attackMap));
 
-	// check around king for pins
-	uint64_t kingAdjacentDanger = KingAttacks[friendlyKingSquare] & attackMap;
+	// we keep track of sliderBoards b/c bitboards don't include the piece's starting square
+	// keeping track of this is relatively cheap & most of the time still saves time over just brute force
+	// checking every direction.
+	uint64_t kingAdjacentDanger = KingAttacks[friendlyKingSquare] & (attackMap | sliderBoard);
 	uint64_t friendly = state.getFriendlyOccuupancyBoard();
 
+	// check around king for pins
 	forEachBit([&](uint8_t square) {
 		// we don't need to search any more if we're already in doubleCheck.
 		// This is up here b/c I can't break out of the bits method in a single statement, so program
@@ -718,13 +732,15 @@ std::string Chess::stateString() {
 	return s;
 }
 
+const uint8_t INVALID_POS = 255;
+
 // this still needs to be tied into imguis init and shutdown
 // when the program starts it will load the current game from the imgui ini file and set the game state to the last saved state
 // modified from Sebastian Lague's Coding Adventure on Chess. 2:37
 void Chess::setStateString(const std::string& fen) {
 	ProtoBoard board;
-	uint8_t wKingSquare;
-	uint8_t bKingSquare;
+	uint8_t wKingSquare = INVALID_POS;
+	uint8_t bKingSquare = INVALID_POS;
 
 	size_t i = 0;
 	{ int file = 7, rank = 0;
@@ -764,6 +780,11 @@ void Chess::setStateString(const std::string& fen) {
 	if (i >= fen.size()) {
 		int castling = 15;
 		// if Kings are not in starting position, then disable that side's ability to castle.
+
+		if (wKingSquare == INVALID_POS || bKingSquare == INVALID_POS) {
+			throw std::runtime_error("Invalid FEN string. King is missing!");
+		}
+		
 		if (wKingSquare != WhiteKingStartMask) {
 			castling &= 3;
 		}
@@ -771,7 +792,7 @@ void Chess::setStateString(const std::string& fen) {
 			castling &= 12;
 		}
 
-		_state.emplace(board, 0, castling, 255, 0, 0, wKingSquare, bKingSquare);
+		_state.emplace(board, 0, castling, INVALID_POS, 0, 0, wKingSquare, bKingSquare);
 		return;
 	}
 
@@ -804,7 +825,7 @@ void Chess::setStateString(const std::string& fen) {
 		castling &= 12;
 	}
 
-	uint8_t enTarget = 255;
+	uint8_t enTarget = INVALID_POS;
 	if (fen[i] != '-') {
 		int col	= fen[i++] - 'a';
 		int row	= fen[i++] - '1';
