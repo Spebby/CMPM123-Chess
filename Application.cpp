@@ -61,13 +61,33 @@ namespace ClassGame {
 
 	void drawState() {
 		ImGui::BeginChild("State", ImVec2(300, 400), true);
+
 		GameState state = game->getState();
+
+		uint8_t castling = state.getCastlingRights();
+		std::string castleString;
+		if ((castling & (1 << 3)) != 0) {
+			castleString += 'K';
+		}
+		if ((castling & (1 << 2)) != 0) {
+			castleString += 'Q';
+		}
+		if ((castling & (1 << 1)) != 0) {
+			castleString += 'k';
+		}
+		if ((castling & (1 << 0)) != 0) {
+			castleString += 'q';
+		}
+		if (castling == 0) {
+			castleString += '-';
+		}
+
 		ImGui::Text("Game State");
 		ImGui::Text("Clock: %d", state.getClock());
 		ImGui::Text("Half Clock: %d", state.getHalfClock());
 		ImGui::Text("Black's Turn? %d", state.isBlackTurn());
 		ImGui::Text("En Passant Square: %s", ChessSquare::indexToPosNotation(state.getEnPassantSquare()).c_str());
-		ImGui::Text("Castle Rights %d", state.getCastlingRights());
+		ImGui::Text("Castle Rights %s", castleString.c_str());
 
 		std::string stateStr = "";
 		ProtoBoard bitboard = state.getProtoBoard();

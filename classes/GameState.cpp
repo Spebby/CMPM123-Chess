@@ -221,7 +221,7 @@ void GameState::UnmakeMove(const Move& move) {
 	}
 
 	if (move.isCastle()) {
-		bool kingside = (to == BitMasks::BlackKingsideMask) || (to == BitMasks::WhiteKingsideMask);
+		bool kingside = (to == PositionMasks::BlackKingsideMask) || (to == PositionMasks::WhiteKingsideMask);
 		const uint8_t originalRookSquare	= kingside ? to + 1 : to - 2;
 		const uint8_t movedRookSquare		= kingside ? to - 1 : to + 1;
 		ChessPiece rook = undoingBlackMove ? (ChessPiece)(Rook | Black) : Rook;

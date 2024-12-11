@@ -90,7 +90,7 @@ void Chess::setUpBoard() {
 
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
 	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    // setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");  // checkmate check
+    //setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");  // checkmate check
     // setStateString("5k2/8/8/3q4/8/8/5PPP/7K"); endTurn(); // debug checkmate, black checkmate in one
     // setStateString("6k1/1P3ppp/8/8/8/8/8/4K3"); // check pawn promotion
     // setStateString("r1bq1rk1/p3bppp/2q2n2/4p3/2B1P3/2N1BQ2/PPP3PP/R3K2R");        // can king castle on queen side with square under attack
@@ -231,13 +231,13 @@ void Chess::CalculateAttackData(GameState& state) {
 		bool onDiagonal = direction > 3;
 
 		for (int i = 0; i < n; i++) {
-			uint8_t cur = friendlyKingSquare + dirOffset * (i + 1);
-			rayMask |= 1ULL << cur;
+			uint8_t currSquare = friendlyKingSquare + (dirOffset * (i + 1));
+			rayMask |= 1ULL << currSquare;
 
-			ChessPiece piece = state.PieceFromIndex(square);
+			ChessPiece piece = state.PieceFromIndex(currSquare);
 			if (piece == NoPiece) continue;
 
-			bool friendlyPiece = (friendly & (1ULL << square)) != 0;
+			bool friendlyPiece = (friendly & (1ULL << currSquare)) != 0;
 			if (friendlyPiece) {
 				if (!friendlyBlock) {
 					friendlyBlock = true;
@@ -334,15 +334,14 @@ void Chess::GeneratePawnMoves(MoveTable& moves, GameState& state) {
 }
 
 inline void Chess::GeneratePawnPush(MoveTable& moves, GameState& state, const uint64_t occupancy, const uint8_t fromSquare) {
-	if (inCheck && isPinned(fromSquare)) return;
 	int moveDir = state.isBlackTurn() ? dir[2] : dir[0];
 	uint8_t toSquare = fromSquare + moveDir;
-	bool canPromote = toSquare == (state.isBlackTurn() ? (fromSquare % 8) : (fromSquare % 8) + 56);
-	bool canDPush = state.isBlackTurn() ? ((fromSquare / 8) == 6) : ((fromSquare / 8) == 1);
 	
 	if ((occupancy & (1ULL << toSquare)) == 0) {
 		// Make sure that we continue to block if pushing. 
 		if (inCheck && !squareIsInCheckRay(toSquare)) return;
+
+		bool canPromote = toSquare == (state.isBlackTurn() ? (fromSquare % 8) : (fromSquare % 8) + 56);
 		if (canPromote) {
 			for (int i = 0; i < 4; i++) {
 				moves[fromSquare].emplace_back(fromSquare, toSquare, Move::FlagCodes::ToQueen << i);
@@ -350,6 +349,7 @@ inline void Chess::GeneratePawnPush(MoveTable& moves, GameState& state, const ui
 		} else {
 			moves[fromSquare].emplace_back(fromSquare, toSquare);
 			toSquare += moveDir;
+			bool canDPush = state.isBlackTurn() ? ((fromSquare / 8) == BlackPawnStartRank) : ((fromSquare / 8) == WhitePawnStartRank);
 			if (canDPush && ((occupancy & (1ULL << toSquare)) == 0)) {
 				moves[fromSquare].emplace_back(fromSquare, toSquare, Move::FlagCodes::DoublePush);
 			}
@@ -365,7 +365,16 @@ inline void Chess::GeneratePawnAttack(MoveTable& moves, GameState& state, const 
 
 		bool EnPassant = state.getEnPassantSquare() == toSquare;
 		// if enpassant square is specified, then we know it's a legal move b/c en passant square is set on previous turn.
-		moves[fromSquare].emplace_back(fromSquare, toSquare, EnPassant ? Move::FlagCodes::EnCapture : 0);
+
+		// promote captures combos
+		bool canPromote = toSquare == (state.isBlackTurn() ? (fromSquare % 8) : (fromSquare % 8) + 56);
+		if (canPromote) {
+			for (int i = 0; i < 4; i++) {
+				moves[fromSquare].emplace_back(fromSquare, toSquare, Move::FlagCodes::ToQueen << i);
+			}
+		} else {
+			moves[fromSquare].emplace_back(fromSquare, toSquare, EnPassant ? Move::FlagCodes::EnCapture : 0);
+		}
 	}, attacks);
 }
 
@@ -459,24 +468,24 @@ void Chess::GenerateKingMoves(MoveTable& moves, GameState& state) {
 		}
 	}, attacks);
 
-	bool canCastleKingSide  = (state.getCastlingRights() & (black ? 0b1000 : 0b0010)) != 0;
-	bool canCastleQueenSide = (state.getCastlingRights() & (black ? 0b0100 : 0b0001)) != 0;
+	bool canCastleKingSide  = (state.getCastlingRights() & (black ? 0b0010 : 0b1000)) != 0;
+	bool canCastleQueenSide = (state.getCastlingRights() & (black ? 0b0001 : 0b0100)) != 0;
 
 	// castling
-	if (!inCheck && canCastleKingSide) {
+	if (!inCheck && generateQuiets) {
 		const uint64_t occupancy = state.getOccupancyBoard();
 		// KingSide, f1, f8
 		const uint64_t blockers = attackMap | occupancy;
 		if (canCastleKingSide) {
-			const uint64_t mask = state.isBlackTurn() ? BitMasks::BlackKingsideMask : BitMasks::WhiteKingsideMask;
+			const uint64_t mask = state.isBlackTurn() ? PositionMasks::BlackKingsideMask : PositionMasks::WhiteKingsideMask;
 			if ((mask & blockers) == 0) {
 				const uint8_t castleSquare = friendlyKingSquare + 1;
 				moves[friendlyKingSquare].emplace_back(friendlyKingSquare, castleSquare, Move::FlagCodes::Castling);
 			}
 		// QueenSide, d1, d8
 		} else if (canCastleQueenSide) {
-			const uint64_t mask      = state.isBlackTurn() ? BitMasks::BlackQueensideMask      : BitMasks::WhiteQueensideMask;
-			const uint64_t blockMask = state.isBlackTurn() ? BitMasks::BlackQueensideBlockMask : BitMasks::WhiteQueensideBlockMask;
+			const uint64_t mask      = state.isBlackTurn() ? PositionMasks::BlackQueensideMask      : PositionMasks::WhiteQueensideMask;
+			const uint64_t blockMask = state.isBlackTurn() ? PositionMasks::BlackQueensideBlockMask : PositionMasks::WhiteQueensideBlockMask;
 			if (((mask & blockers) == 0) && ((blockMask & occupancy) == 0)) {
 				const uint8_t castleSquare = friendlyKingSquare - 2;
 				moves[friendlyKingSquare].emplace_back(friendlyKingSquare, castleSquare, Move::FlagCodes::Castling);
@@ -753,7 +762,16 @@ void Chess::setStateString(const std::string& fen) {
 
 	i++;
 	if (i >= fen.size()) {
-		_state.emplace(board, 0, 0b1111, 255, 0, 0, wKingSquare, bKingSquare);
+		int castling = 15;
+		// if Kings are not in starting position, then disable that side's ability to castle.
+		if (wKingSquare != WhiteKingStartMask) {
+			castling &= 3;
+		}
+		if (bKingSquare != BlackKingStartMask) {
+			castling &= 12;
+		}
+
+		_state.emplace(board, 0, castling, 255, 0, 0, wKingSquare, bKingSquare);
 		return;
 	}
 
@@ -761,17 +779,30 @@ void Chess::setStateString(const std::string& fen) {
 	bool isBlack = (fen[i] == 'b');
 	i += 2;
 
+	bool specifiesRights;
 	uint8_t castling = 0;
 	while (i < fen.size() && fen[i] != ' ') {
 		switch (fen[i++]) {
-			case 'K': castling |= 1 << 3; break;
-			case 'Q': castling |= 1 << 2; break;
-			case 'k': castling |= 1 << 1; break;
-			case 'q': castling |= 1; break;
-			case '-': castling  = 0; break;
+			case 'K': castling |= 1 << 3; specifiesRights = true; break;
+			case 'Q': castling |= 1 << 2; specifiesRights = true; break;
+			case 'k': castling |= 1 << 1; specifiesRights = true; break;
+			case 'q': castling |= 1; specifiesRights = true; break;
+			case '-': castling  = 0; specifiesRights = true; break;
 		}
 	}
 	i++;
+
+	if (!specifiesRights) {
+		castling = 15;
+	}
+
+	// if Kings are not in starting position, then disable that side's ability to castle.
+	if (wKingSquare != WhiteKingStartMask) {
+		castling &= 3;
+	}
+	if (bKingSquare != BlackKingStartMask) {
+		castling &= 12;
+	}
 
 	uint8_t enTarget = 255;
 	if (fen[i] != '-') {
