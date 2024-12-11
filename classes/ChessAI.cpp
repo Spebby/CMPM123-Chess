@@ -110,10 +110,3 @@ int ChessAI::negamax(ChessAI& state, const int depth, int alpha, int beta, const
 
 	return bestVal;
 }
-
-// AI class
-int ChessAI::AICheckForWinner() const {
-
-
-	return 0;
-}

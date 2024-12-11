@@ -71,7 +71,7 @@ void Game::setNumberOfPlayers(unsigned int n) {
 void Game::setAIPlayer(unsigned int playerNumber) {
 	_players.at(playerNumber)->setAIPlayer(true);
 	_gameOps.AIPlayer = playerNumber;
-	_gameOps.AIPlayer = true;
+	_gameOps.AIPlaying = true;
 }
 
 void Game::startGame() {

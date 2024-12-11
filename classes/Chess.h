@@ -40,10 +40,10 @@ public:
 	BitHolder&	getHolderAt(const int x, const int y) override { return _grid[y * 8 + x]; }
 
 	void		updateAI() override;
-	bool		gameHasAI() override { return false; }
+	bool		gameHasAI() override { return true; }
 
 	// we only use this in application.cpp for debugging purposes
-	MoveTable getMoves() const { return _playerMoves; }
+	MoveTable getMoves() const { return _currentMoves; }
 	GameState getState() const { return _state.top(); }
 
 private:
@@ -70,7 +70,7 @@ private:
 
 	// the non-AI player's moves. We cache this as our agnostic backend can't be modified to support passing a move list
 	// directly (nor should it). For player turns specifically, the engine running at 100% efficientcy is overkill.
-	MoveTable _playerMoves;
+	MoveTable _currentMoves;
 	// I don't need to use a stack, a vector would be perfectly fine, but a stack is syntactically simpler.
 	std::stack<ChessSquare*> _litSquare;
 };

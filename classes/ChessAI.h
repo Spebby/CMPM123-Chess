@@ -16,8 +16,6 @@ class ChessAI {
     // TODO: Look into alternative negamaxes like C*
 
     private:
-    int AICheckForWinner() const;
-
     GameState& _state;
     ProtoBoard& _board;
 };

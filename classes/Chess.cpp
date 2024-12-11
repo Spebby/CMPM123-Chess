@@ -17,6 +17,9 @@ Chess::Chess() {
 	// TODO: replace _state with vector & manage it like it's a stack internally.
 	// ^ this is probably not neccesary. For the AI specifically, it may be possible to insert directly into a longer vector, while still keeping
 	// the hash table for convenience when workign w/ player moves.
+
+	// TODO: Let player set this by hand.
+	_gameOps.AIPlayer = 1;
 }
 
 Chess::~Chess() {
@@ -60,9 +63,9 @@ ChessBit* Chess::PieceForPlayer(const char piece) {
 }
 
 Move* Chess::MoveForPositions(const int i, const int j) {
-	for (unsigned int k = 0; k < _playerMoves[i].size(); k++) {
-		if (_playerMoves[i][k].getTo() == j) {
-			return &_playerMoves[i][k];
+	for (unsigned int k = 0; k < _currentMoves[i].size(); k++) {
+		if (_currentMoves[i][k].getTo() == j) {
+			return &_currentMoves[i][k];
 		}
 	}
 
@@ -89,12 +92,12 @@ void Chess::setUpBoard() {
 	}
 
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
-	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
+	// setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
     // setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");				// checkmate check
     // setStateString("5k2/8/8/3q4/8/8/5PPP/7K"); endTurn(); 						// debug checkmate, black checkmate in one
     // setStateString("6k1/1P3ppp/8/8/8/8/8/4K3");									// check pawn promotion
     // setStateString("r1bq1rk1/p3bppp/2q2n2/4p3/2B1P3/2N1BQ2/PPP3PP/R3K2R");		// can king castle on queen side with square under attack
-    // setStateString("r1bqkbnr/ppp2ppp/2n5/3pQ3/8/5N1P/PPP1PPP1/RNBQKB1R");		// black in check
+    // setStateString("r1bqkbnr/ppp2ppp/2n5/3pQ3/8/5N1P/PPP1PPP1/RNBQKB1R");		// black in check -- Invalid state. FEN should throw an error.
     // setStateString("Q7/3k4/5K1p/5PpP/6P1/8/8/8");								// white to move but makes illegal move
     // setStateString("5k2/2R5/8/3Q3p/3p4/3P1K2/4P3/8");							// white can checkmate
     // setStateString("r1bn3r/pp3ppp/5k2/q1pP4/2N5/P1QB4/1Q3PPP/R3K2R");			// didn't see check
@@ -106,7 +109,7 @@ void Chess::setUpBoard() {
 	// http://www.netreal.de/Forsyth-Edwards-Notation/index.php
 
 	startGame();
-	_playerMoves = MoveGenerator(currState, false);
+	_currentMoves = MoveGenerator(currState, false);
 }
 
 // ================================ Move Generation ================================
@@ -540,9 +543,9 @@ bool Chess::canBitMoveFrom(Bit& bit, BitHolder& src) {
 	bool canMove = false;
 	const int i = srcSquare.getIndex();
 
-	if (_playerMoves.count(i)) {
+	if (_currentMoves.count(i)) {
 		canMove = true;
-		for (Move move : _playerMoves[i]) {
+		for (Move move : _currentMoves[i]) {
 			uint8_t attacking = move.getTo();
 			_grid[attacking].setMoveHighlighted(true);
 			_litSquare.push(&_grid[attacking]);
@@ -558,7 +561,7 @@ bool Chess::canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) {
 	ChessSquare& dstSquare = static_cast<ChessSquare&>(dst);
 	const uint8_t i = srcSquare.getIndex();
 	const uint8_t j = dstSquare.getIndex();
-	for (Move move : _playerMoves[i]) {
+	for (Move move : _currentMoves[i]) {
 		if (move.getTo() == j) {
 			return true;
 		}
@@ -636,25 +639,34 @@ inline void Chess::clearPositionHighlights() {
 
 // free all the memory used by the game on the heap
 void Chess::stopGame() {
-
+	for (int i = 0; i < 64; i++) {
+		_grid[i].destroyBit();
+	}
 }
 
 void Chess::endTurn() {
+	_currentMoves = MoveGenerator(currState, false);
+
 	Game::endTurn();
-	if (gameHasAI()) {
+
+	// Game checks for if game is over in super.
+
+
+	if (gameHasAI() && getCurrentPlayer() && getCurrentPlayer()->isAIPlayer()) {
 		// If AI is next, we don't need to cache player moves.
-		if (_gameOps.AIPlayer == (_turns.size() % 2)) {
-			updateAI();
-			return;
-		}
+		updateAI();
+		return;
 	}
 
-	_playerMoves = MoveGenerator(currState, false);
 	Loggy.log(stateString());
 }
 
 Player* Chess::checkForWinner() {
 	// check to see if either player has won
+	if (_currentMoves.size() == 0) {
+		return getInactivePlayer();
+	}
+
 	return nullptr;
 }
 
@@ -841,6 +853,9 @@ void Chess::setStateString(const std::string& fen) {
 	while (std::isdigit(fen[++i])) { fClock = fClock * 10 + (fen[i] - '0'); }
 
 	_state.emplace(board, isBlack, castling, enTarget, hClock, fClock, wKingSquare, bKingSquare);
+
+	// TODO: analyse the fen string to make sure king enemy king is not in check.
+	// if it is, throw an error.
 }
 
 /**
@@ -861,7 +876,7 @@ void Chess::setStateString(const std::string& fen) {
  * 
  * threefoldRepetitionList
  * 
- * Filter Illegal Moves
+ * Filter Illegal Moves(?)
  */
 
 
@@ -873,12 +888,10 @@ const int inf = 999999UL;
 void Chess::updateAI() {
 	// run negamax on all avalible positions.
 	int bestVal = -inf;
-	Move* bestMove = nullptr;
+	const Move* bestMove = nullptr;
 
-	MoveTable firstMoves = MoveGenerator(currState, false);
-
-	for(int fromSquare = 0; fromSquare < 64; fromSquare++) {
-		std::vector<Move>& moveList = firstMoves.at(fromSquare);
+	for (const auto& pair : _currentMoves) {
+		const std::vector<Move>& moveList = pair.second;
 		for (int i = 0; i < moveList.size(); i++) {
 			ChessAI newState = ChessAI(GameState(currState, moveList[i]));
 			int moveVal = -newState.negamax(newState, 0, -inf, inf, currState.isBlackTurn());

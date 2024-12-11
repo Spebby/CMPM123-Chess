@@ -179,11 +179,8 @@ namespace ClassGame {
 		ImGui::Text("Current Player Number: %d", game->getCurrentPlayer()->playerNumber());
 		ImGui::Text("Current Board State: %s", game->stateString().c_str());
 
-		drawState();
-		drawMoveProber();
-
 		if (gameOver) {
-			ImGui::Text("Game Over!");
+			ImGui::Text("\nGame Over!");
 			ImGui::Text("Winner: %d", gameWinner);
 			if (ImGui::Button("Reset Game")) {
 				game->stopGame();
@@ -192,6 +189,10 @@ namespace ClassGame {
 				gameWinner = -1;
 			}
 		}
+
+		drawState();
+		drawMoveProber();
+
 		ImGui::End();
 
 		ImGui::Begin("GameWindow");
