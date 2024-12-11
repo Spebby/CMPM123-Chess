@@ -90,7 +90,8 @@ GameState::GameState(const GameState& old, const Move& move)
 				newPiece = ChessPiece::Bishop;
 				break;
 		}
-		bits.enable((ChessPiece)(newPiece | (isBlack << 3)), to);
+		bits.disable((ChessPiece)(Pawn | (!isBlack << 3)), to);
+		bits.enable((ChessPiece)(newPiece | (!isBlack << 3)), to);
 	}
 }
 
@@ -187,7 +188,8 @@ void GameState::MakeMove(const Move& move) {
 				newPiece = ChessPiece::Bishop;
 				break;
 		}
-		bits.enable((ChessPiece)(newPiece | (isBlack << 3)), to);
+		bits.disable((ChessPiece)(Pawn | (!isBlack << 3)), to);
+		bits.enable((ChessPiece)(newPiece | (!isBlack << 3)), to);
 	}
 
 	// We do these at the end now, b/c we can't rely on there being an old board to reference.
@@ -209,7 +211,7 @@ void GameState::UnmakeMove(const Move& move) {
 	bool undoingPromotion	= move.isPromotion();
 	bool undoingCapture     = (capturedPieceType != NoPiece);
 
-	const ChessPiece mover = undoingPromotion ? (ChessPiece)(Pawn | isBlack ? Black : 0) : bits.PieceFromIndex(to);
+	const ChessPiece mover = bits.PieceFromIndex(to);
 
 	if (undoingCapture) {
 		uint8_t captureSquare = to;
@@ -231,6 +233,9 @@ void GameState::UnmakeMove(const Move& move) {
 
 	bits.disable(mover, to);
 	bits.enable(mover, from);
+	if (undoingPromotion) {
+		bits.enable((ChessPiece)(Pawn | (!undoingBlackMove << 3)), from);
+	}
 
 	// TODO: currently, we aren't restoring flags associated with a previous state.
 	// I'm not really sure how best to go about this without lugging around a bunch
