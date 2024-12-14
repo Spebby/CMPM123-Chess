@@ -1,5 +1,7 @@
 #include "ChessSquare.h"
 #include "Bit.h"
+
+#ifdef DEBUG
 #include "../tools/Logger.h"
 
 // logging cords is common enough that that making a helper feels justified
@@ -13,6 +15,7 @@ std::string formatCords(const float a, const float b) {
 std::string formatCords(const int a, const int b) {
 	return "(" + std::to_string(a) + ", " + std::to_string(b) + ")";
 }
+#endif
 
 inline char generateNotation(ChessBit* abit) {
 	if (abit) {

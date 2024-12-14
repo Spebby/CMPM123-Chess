@@ -1,7 +1,10 @@
 #include "Application.h"
 #include "imgui/imgui.h"
 #include "classes/Chess.h"
+
+#ifdef DEBUG
 #include "tools/Logger.h"
+#endif
 
 namespace ClassGame {
 	Chess *game = nullptr;

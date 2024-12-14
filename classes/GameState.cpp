@@ -1,6 +1,9 @@
 #include <cstring>
 #include "GameState.h"
+
+#ifdef DEBUG
 #include "../tools/Logger.h"
+#endif
 
 const uint8_t MAX_DEPTH = 24; // for AI purposes
 // Generate from FEN

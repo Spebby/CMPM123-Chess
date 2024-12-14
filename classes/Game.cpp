@@ -4,7 +4,6 @@
 #include "Turn.h"
 #include "../Application.h"
 #include <cmath>
-#include "../tools/Logger.h"
 
 Game::Game() {
 	_gameOps.AIPlayer = false;
@@ -83,9 +82,6 @@ void Game::startGame() {
 }
 
 void Game::endTurn() {
-#ifdef DEBUG
-	Loggy.log(Logger::INFO, "Turn end.");
-#endif
 	_gameOps.currentTurnNo++;
 	std::string startState = stateString();
 	Turn *turn = new Turn;

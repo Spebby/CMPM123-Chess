@@ -1,6 +1,9 @@
 #include "BitHolder.h"
 #include "Bit.h"
+
+#ifdef DEBUG
 #include "../tools/Logger.h"
+#endif
 
 BitHolder::~BitHolder() {
 

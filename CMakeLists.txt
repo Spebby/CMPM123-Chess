@@ -41,9 +41,6 @@ else() # Linux
     set(IMPL_FILE "imgui/imgui_impl_glfw.cpp")
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-DDEBUG)
-endif()
 
 # Define the executable and sources
 set(SOURCES
@@ -68,8 +65,12 @@ set(SOURCES
     classes/Chess.cpp
     ${MAIN_FILE}
     ${IMPL_FILE}
-    tools/Logger.cpp
 )
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+    list(APPEND SOURCES tools/Logger.cpp)
+endif()
 
 # Define the executable and sources
 add_executable(Chess ${SOURCES})

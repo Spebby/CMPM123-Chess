@@ -2,6 +2,10 @@
 #include "MagicBitboards/BitFunctions.h"
 #include "MagicBitboards/EvaluationTables.h"
 
+#ifdef DEBUG
+#include "../tools/Logger.h"
+#endif
+
 const int inf = 999999UL;
 
 ChessAI::ChessAI(GameState state) : _state(state), _board(state.getProtoBoard()) {
@@ -83,8 +87,6 @@ int Chess::evaluateBoard(const char* state) {
 	return score;
 }
 */
-
-#include "../tools/Logger.h"
 
 int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int beta) {
     if (depth == 0) {
