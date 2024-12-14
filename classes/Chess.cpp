@@ -16,9 +16,6 @@ const int MAX_DEPTH = 3;
 
 Chess::Chess() {
 	initMagicBitboards();
-	// TODO: replace _state with vector & manage it like it's a stack internally.
-	// ^ this is probably not neccesary. For the AI specifically, it may be possible to insert directly into a longer vector, while still keeping
-	// the hash table for convenience when workign w/ player moves.
 
 	// TODO: Let player set this by hand.
 	_gameOps.AIPlayer = 1;
@@ -64,10 +61,10 @@ ChessBit* Chess::PieceForPlayer(const char piece) {
 	return PieceForPlayer((int)!std::isupper(piece), pieceFromSymbol.at(std::tolower(piece)));
 }
 
-Move* Chess::MoveForPositions(const int i, const int j) {
-	for (unsigned int k = 0; k < _currentMoves[i].size(); k++) {
-		if (_currentMoves[i][k].getTo() == j) {
-			return &_currentMoves[i][k];
+Move* Chess::MoveForPositions(const int from, const int to) {
+	for (Move& move : _currentMoves) {
+		if (move.getFrom() == from && move.getTo() == to) {
+			return &move;
 		}
 	}
 
@@ -132,19 +129,38 @@ bool Chess::canBitMoveFrom(Bit& bit, BitHolder& src) {
 	bool canMove = false;
 	const int i = srcSquare.getIndex();
 
-	if (_currentMoves.count(i)) {
-		canMove = true;
-		for (Move move : _currentMoves[i]) {
+	for (const Move& move : _currentMoves) {
+		if (move.getFrom() == i) {
+			canMove = true;
 			uint8_t attacking = move.getTo();
 			_grid[attacking].setMoveHighlighted(true);
 			_litSquare.push(&_grid[attacking]);
-			#ifdef DEBUG
-			//Loggy.log("Pushed to lit: " + std::to_string(attacking));
-			#endif
 		}
 	}
 	return canMove;
 }
+
+/**
+bool Chess::canBitMoveFrom(Bit& bit, BitHolder& src) {
+    ChessSquare& srcSquare = static_cast<ChessSquare&>(src);
+    bool canMove = false;
+    for (auto move : _moves) {
+        if (move.from == srcSquare.getSquareIndex()) {
+            canMove = true;
+            for (int y = 0; y < _gameOptions.rowY; y++) {
+                for (int x = 0; x < _gameOptions.rowX; x++) {
+                    ChessSquare& dstSquare = _grid[y][x];
+                    ;
+                    if (move.to == dstSquare.getSquareIndex()) {
+                        dstSquare.setMoveHighlighted(true);
+                    }
+                }
+            }
+        }
+    }
+    return canMove;
+}
+ */
 
 // Is the piece allowed to move here?
 bool Chess::canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) {
@@ -152,8 +168,8 @@ bool Chess::canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) {
 	ChessSquare& dstSquare = static_cast<ChessSquare&>(dst);
 	const uint8_t i = srcSquare.getIndex();
 	const uint8_t j = dstSquare.getIndex();
-	for (Move move : _currentMoves[i]) {
-		if (move.getTo() == j) {
+	for (const Move& move : _currentMoves) {
+		if (move.getFrom() == i && move.getTo() == j) {
 			return true;
 		}
 	}
@@ -484,22 +500,19 @@ void Chess::updateAI() {
 	#ifdef DEBUG
 	Loggy.log("Starting AI Occuancy: " + std::to_string(currState.getOccupancyBoard()));
 	#endif
-	for (const auto& pair : _currentMoves) {
-		const std::vector<Move>& moveList = pair.second;
-		for (const Move move : moveList) {
-			ChessAI newState = ChessAI(GameState(currState, move));
-			#ifdef DEBUG
-			uint64_t bit = newState.logDebugInfo();
-			#endif
-			//newState.reserveMemoryStack(MAX_DEPTH);
-			int moveVal = -newState.negamax(MAX_DEPTH, 0, -inf, inf);
-			
-			// Logger::getInstance().log(std::to_string(i) + " eval is " + std::to_string(moveVal));
+	for (const Move& move : _currentMoves) {
+		ChessAI newState = ChessAI(GameState(currState, move));
+		#ifdef DEBUG
+		uint64_t bit = newState.logDebugInfo();
+		#endif
+		//newState.reserveMemoryStack(MAX_DEPTH);
+		int moveVal = -newState.negamax(MAX_DEPTH, 0, -inf, inf);
+		
+		// Logger::getInstance().log(std::to_string(i) + " eval is " + std::to_string(moveVal));
 
-			if (moveVal > bestVal) {
-				bestMove = &move;
-				bestVal  = moveVal;
-			}
+		if (moveVal > bestVal) {
+			bestMove = &move;
+			bestVal  = moveVal;
 		}
 	}
 

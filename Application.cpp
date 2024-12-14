@@ -28,24 +28,25 @@ namespace ClassGame {
 			ImGui::TableSetupColumn("Moves", ImGuiTableColumnFlags_WidthFixed  | ImGuiTableColumnFlags_DefaultSort);
 			ImGui::TableHeadersRow();
 
-			std::unordered_map<uint8_t, std::vector<Move>> moves = game->getMoves();
-			std::vector<std::pair<int, std::vector<Move>>> moveList;
-			moveList.reserve(64);
-			for (int i = 0; i < 64; i++) {
-				moveList.emplace_back(i, moves[i]);
+			std::vector<Move> moves = game->getMoves();
+			std::vector<std::vector<Move>> moveList;
+			moveList.resize(64);
+
+			for (const Move& move : moves) {
+				moveList[move.getFrom()].emplace_back(move);
 			}
 
-			for(const std::pair<int, std::vector<Move>>& data : moveList) {
+			for(int i = 0; i < 64; i++) {
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("%s", ChessSquare::indexToPosNotation(data.first).c_str());
+				ImGui::Text("%s", ChessSquare::indexToPosNotation(i).c_str());
 
 				ImGui::TableSetColumnIndex(1);
-				std::string moves;
-				for (Move i : data.second) {
-					moves += ChessSquare::indexToPosNotation(i.getTo()) + " ";
+				std::string position;
+				for (const Move& move : moveList[i]) {
+					position += ChessSquare::indexToPosNotation(move.getTo()) + " ";
 				}
-				ImGui::Text("%s", moves.c_str());
+				ImGui::Text("%s", position.c_str());
 			}
 
 			ImGui::EndTable();

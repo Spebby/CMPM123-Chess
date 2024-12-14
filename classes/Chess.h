@@ -1,15 +1,12 @@
 #pragma once
 
 #include <vector>
-#include <unordered_map>
 #include <stack>
 
 #include "Game.h"
 #include "ChessSquare.h"
 #include "GameState.h"
 #include "ChessPiece.h"
-
-typedef std::unordered_map<uint8_t, std::vector<Move>> MoveTable;
 
 // the main game class
 class Chess : public Game {
@@ -31,7 +28,7 @@ public:
 	bool		canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) override;
 	void		bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
 
-	static MoveTable MoveGenerator(GameState&, bool=false);
+	static std::vector<Move> MoveGenerator(GameState&, bool=false);
 	static bool isPinned(int);
 	static bool isMovingAlongRay(int, int, int);
 	static bool squareIsInCheckRay(int);
@@ -43,7 +40,7 @@ public:
 	bool		gameHasAI() override { return true; }
 
 	// we only use this in application.cpp for debugging purposes
-	MoveTable getMoves() const { return _currentMoves; }
+	std::vector<Move> getMoves() const { return _currentMoves; }
 	GameState getState() const { return _state.top(); }
 
 private:
@@ -55,20 +52,20 @@ private:
 	inline void 	clearPositionHighlights();
 
 	static void CalculateAttackData(GameState&);
-	static void GeneratePawnMoves(MoveTable&, GameState&);
-	static inline void GeneratePawnPush(MoveTable&,   GameState&, const uint64_t, const uint8_t);
-	static inline void GeneratePawnAttack(MoveTable&, GameState&, const uint64_t, const uint8_t); // helper
-	static void GenerateKnightMoves(MoveTable&,  GameState&);
-	static void GenerateSlidingMoves(MoveTable&, GameState&);
-	static inline void GenerateSlidingMovesHelper(MoveTable&, const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
-	static void GenerateKingMoves(MoveTable&, GameState&);
+	static void GeneratePawnMoves(std::vector<Move>&, GameState&);
+	static inline void GeneratePawnPush(std::vector<Move>&,   GameState&, const uint64_t, const uint8_t);
+	static inline void GeneratePawnAttack(std::vector<Move>&, GameState&, const uint64_t, const uint8_t); // helper
+	static void GenerateKnightMoves(std::vector<Move>&,  GameState&);
+	static void GenerateSlidingMoves(std::vector<Move>&, GameState&);
+	static inline void GenerateSlidingMovesHelper(std::vector<Move>&, const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
+	static void GenerateKingMoves(std::vector<Move>&, GameState&);
 
 	ChessSquare	_grid[64];
 	std::stack<GameState> _state;
 
 	// the non-AI player's moves. We cache this as our agnostic backend can't be modified to support passing a move list
 	// directly (nor should it). For player turns specifically, the engine running at 100% efficientcy is overkill.
-	MoveTable _currentMoves;
+	std::vector<Move> _currentMoves;
 	// I don't need to use a stack, a vector would be perfectly fine, but a stack is syntactically simpler.
 	std::stack<ChessSquare*> _litSquare;
 };

@@ -97,7 +97,7 @@ int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int bet
 	// Todo: TranspositionTable optimisation would be nice.
 
 
-	MoveTable moves = Chess::MoveGenerator(_state, false);
+	std::vector<Move> moves = Chess::MoveGenerator(_state, false);
 
 	/*
 	if (moves.size() == 0) {
@@ -112,29 +112,27 @@ int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int bet
 	int bestValue = -inf; // Negative "Infinity"
 	//uint64_t bitboard = isBlack ? _board.getWhiteOccupancyBoard() : _board.getBlackOccupancyBoard();
 
-	for (const auto& t : moves) {
-		const std::vector<Move> moveList = t.second;
+	for (const Move& move : moves) {
 		#ifdef DEBUG
 		Loggy.log("Depth: " + std::to_string(depth) + " index: " + std::to_string(t.first));
 		#endif
-		for (const Move& move : moveList) {
-			// Make, Mo' Nega, Unmake, Prune.
-			GameStateMemory memory = _state.makeMemoryState();
-			_state.MakeMove(move);
-			#ifdef DEBUG
-			uint64_t bit = logDebugInfo();
-			#endif
-			int score = std::max(bestValue, -negamax(depth - 1, distFromRoot + 1, -beta, -alpha));
-			#ifdef DEBUG
-			Loggy.log(std::to_string(score));
-			#endif
-			_state.UnmakeMove(move, memory);
 
-			alpha = std::max(bestValue, alpha);
+		// Make, Mo' Nega, Unmake, Prune.
+		GameStateMemory memory = _state.makeMemoryState();
+		_state.MakeMove(move);
+		#ifdef DEBUG
+		uint64_t bit = logDebugInfo();
+		#endif
+		int score = std::max(bestValue, -negamax(depth - 1, distFromRoot + 1, -beta, -alpha));
+		#ifdef DEBUG
+		Loggy.log(std::to_string(score));
+		#endif
+		_state.UnmakeMove(move, memory);
 
-			if (alpha >= beta) {
-				return bestValue;
-			}
+		alpha = std::max(bestValue, alpha);
+
+		if (alpha >= beta) {
+			return bestValue;
 		}
 	}
 
