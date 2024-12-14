@@ -124,20 +124,15 @@ int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int bet
 			#ifdef DEBUG
 			uint64_t bit = logDebugInfo();
 			#endif
-			int score = -negamax(depth - 1, distFromRoot + 1, -beta, -alpha);
+			int score = std::max(bestValue, -negamax(depth - 1, distFromRoot + 1, -beta, -alpha));
 			#ifdef DEBUG
 			Loggy.log(std::to_string(score));
 			#endif
 			_state.UnmakeMove(move, memory);
 
-			if (score > bestValue) {
-				bestValue = score;
-				if (score > alpha) {
-					alpha = score;
-				}
-			}
+			alpha = std::max(bestValue, alpha);
 
-			if (score >= beta) {
+			if (alpha >= beta) {
 				return bestValue;
 			}
 		}

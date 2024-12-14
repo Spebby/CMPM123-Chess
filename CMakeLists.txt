@@ -42,38 +42,64 @@ else() # Linux
 endif()
 
 
-# Define the executable and sources
-set(SOURCES
-	Application.cpp
-	imgui/imgui_demo.cpp
-	imgui/imgui_draw.cpp
-	imgui/imgui_tables.cpp
-	imgui/imgui_widgets.cpp
-	imgui/imgui.cpp
-	imgui/imgui_impl_opengl3.cpp
-    classes/ChessAI.cpp
-    classes/MagicBitboards/MagicBitboards.cpp
-    classes/Move.cpp
-    classes/MagicBitboards/ProtoBoard.cpp
-    classes/GameState.cpp
-    classes/Bit.cpp
-    classes/BitHolder.cpp
-    classes/ChessSquare.cpp
-    classes/Game.cpp
-    classes/Sprite.cpp
-    classes/MoveGeneration.cpp
-    classes/Chess.cpp
-    ${MAIN_FILE}
-    ${IMPL_FILE}
-)
+
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-DDEBUG)
-    list(APPEND SOURCES tools/Logger.cpp)
+    set(SOURCES
+        Application.cpp
+        imgui/imgui_demo.cpp
+        imgui/imgui_draw.cpp
+        imgui/imgui_tables.cpp
+        imgui/imgui_widgets.cpp
+        imgui/imgui.cpp
+        imgui/imgui_impl_opengl3.cpp
+        classes/ChessAI.cpp
+        classes/MagicBitboards/MagicBitboards.cpp
+        classes/Move.cpp
+        classes/MagicBitboards/ProtoBoard.cpp
+        classes/GameState.cpp
+        classes/Bit.cpp
+        classes/BitHolder.cpp
+        classes/ChessSquare.cpp
+        classes/Game.cpp
+        classes/Sprite.cpp
+        classes/MoveGeneration.cpp
+        classes/Chess.cpp
+        ${MAIN_FILE}
+        ${IMPL_FILE}
+        tools/Logger.cpp
+    )
+else()
+    set(SOURCES
+        Application.cpp
+        imgui/imgui_demo.cpp
+        imgui/imgui_draw.cpp
+        imgui/imgui_tables.cpp
+        imgui/imgui_widgets.cpp
+        imgui/imgui.cpp
+        imgui/imgui_impl_opengl3.cpp
+        classes/ChessAI.cpp
+        classes/MagicBitboards/MagicBitboards.cpp
+        classes/Move.cpp
+        classes/MagicBitboards/ProtoBoard.cpp
+        classes/GameState.cpp
+        classes/Bit.cpp
+        classes/BitHolder.cpp
+        classes/ChessSquare.cpp
+        classes/Game.cpp
+        classes/Sprite.cpp
+        classes/MoveGeneration.cpp
+        classes/Chess.cpp
+        ${MAIN_FILE}
+        ${IMPL_FILE}
+    )
 endif()
 
 # Define the executable and sources
 add_executable(Chess ${SOURCES})
+
+target_compile_definitions(Chess PRIVATE $<$<CONFIG:Debug>:DEBUG>)
+target_sources(Chess PRIVATE $<$<CONFIG:Debug>:tools/Logger.cpp>)
 
 # headers used to make IDEs not scream at me.
 target_sources(Chess PRIVATE
