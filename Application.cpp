@@ -198,7 +198,9 @@ namespace ClassGame {
 		ImGui::Begin("GameWindow");
 		game->drawFrame();
 		ImGui::End();
+		#ifdef DEBUG
 		Loggy.draw();
+		#endif
 	}
 
 	// end turn is called by the game code at the end of each turn

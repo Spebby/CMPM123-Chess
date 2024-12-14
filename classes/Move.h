@@ -65,6 +65,7 @@ class Move {
 	uint16_t getButterflyIndex() const { return move & 0x0fff; }
 
 	protected:
-	uint32_t move : 24;
+	// we only use 24 bits, but avoiding bitfield to improve portability.
+	uint32_t move;
 };
 #pragma pack(pop)

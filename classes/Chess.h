@@ -63,8 +63,6 @@ private:
 	static inline void GenerateSlidingMovesHelper(MoveTable&, const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
 	static void GenerateKingMoves(MoveTable&, GameState&);
 
-	static bool draw(const MoveTable&, bool);
-
 	ChessSquare	_grid[64];
 	std::stack<GameState> _state;
 

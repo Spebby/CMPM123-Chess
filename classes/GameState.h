@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <stack>
 
 #include "MagicBitboards/ProtoBoard.h"
 #include "Move.h"
@@ -8,6 +9,19 @@
 // TODO read these
 // https://www.chessprogramming.org/Repetitions
 // http://www.open-chess.org/viewtopic.php?f=3&t=2209
+
+// 2 bytes... safe to pack.
+// Keeps track of disposable memory.
+#pragma pack(push, 1)
+struct GameStateMemory {
+	uint8_t halfClock;
+	// 4 bits in reality, but to pack efficently on all systems, half a byte screws with this.
+	uint8_t castlingRights;
+	ChessPiece capturedPieceType;
+
+	GameStateMemory(uint8_t hc, uint8_t cr, ChessPiece cpt) : halfClock(hc), castlingRights(cr), capturedPieceType(cpt) {}
+};
+#pragma pack(pop)
 
 class GameState {
 	public:
@@ -25,18 +39,20 @@ class GameState {
 	bool operator==(const GameState&);
 
 	void MakeMove(const Move&);
-	void UnmakeMove(const Move&);
+	void UnmakeMove(const Move&, const GameStateMemory&);
 	// TODO: We're going to need to figure out a proper way to restore
 	// TODO: rights when unmaking, since keeping track of castling rights is pretty
 	// TODO: important, same w/ half clock.
 
+	GameStateMemory makeMemoryState() {
+		// hoping RVO kicks in.
+		GameStateMemory memory = GameStateMemory(halfClock, castlingRights, capturedPieceType);
+		return memory;
+	}
+
 	// this is really funny so i will be using this syntax
 	void operator+(const Move& move) {
 		MakeMove(move);
-	}
-
-	void operator-(const Move& move) {
-		UnmakeMove(move);
 	}
 
 	bool isBlackTurn() const { return isBlack; }
@@ -58,8 +74,6 @@ class GameState {
 	uint64_t getEnemyOccuupancyBoard()    const { return isBlack ? bits.getWhiteOccupancyBoard() : bits.getBlackOccupancyBoard(); }
 
 	const uint64_t& getPieceOccupancyBoard(ChessPiece piece, bool isBlack) const { return bits[isBlack ? (piece + 5) : piece - 1]; }
-
-	int evaluateBoard() const;
 
 	protected:
 	// I wanted a class that managed muh bits a bit nicer than a c-string, and one that

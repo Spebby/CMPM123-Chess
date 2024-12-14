@@ -7,15 +7,24 @@ class ChessAI {
     ChessAI(GameState);
 
     // Returns: positive value if AI wins, negative if human player wins, 0 for draw or undecided
-    int evaluateBoard(const ProtoBoard&) const;
+    int evaluateBoard();
 
     // init like this : negamax(rootState, depth, -inf, +inf, 1)
     // player is the current player's number (AI or human)
-    int negamax(ChessAI&, const int, const int, const int, const bool);
-
+    int negamax(const int depth, const int distFromRoot, const int alpha, const int beta);
     // TODO: Look into alternative negamaxes like C*
 
+    int Quiesce(const int alpha, const int beta);
+
+    #ifdef DEBUG
+    // This is purely for debugging.
+    uint64_t logDebugInfo() const;
+    #endif
+
     private:
+    bool isDraw() const;
+    bool InCheck() const;
+
     GameState& _state;
     ProtoBoard& _board;
 };

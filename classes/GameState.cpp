@@ -15,7 +15,7 @@ GameState::GameState(const ProtoBoard& board, const bool isBlack, const uint8_t 
 	clock(fClock),
 	friendlyKingSquare(isBlack ? bKingSquare : wKingSquare),
 	enemyKingSquare(isBlack ? wKingSquare : bKingSquare),
-	capturedPieceType(NoPiece) { }
+	capturedPieceType(NoPiece) {}
 
 // generate next move
 GameState::GameState(const GameState& old, const Move& move)
@@ -198,7 +198,11 @@ void GameState::MakeMove(const Move& move) {
 	enPassantSquare = move.isDoublePush() ? (move.getTo() + (isBlack ? -8 : 8)) : 255;
 }
 
-void GameState::UnmakeMove(const Move& move) {
+void GameState::UnmakeMove(const Move& move, const GameStateMemory& memory) {
+	uint8_t temp = friendlyKingSquare;
+	friendlyKingSquare = enemyKingSquare;
+	enemyKingSquare = temp;
+
 	// for now, we shouldn't worry about undoing fifty move counter.
 	isBlack = !isBlack;
 	bool undoingBlackMove = isBlack;
@@ -213,22 +217,35 @@ void GameState::UnmakeMove(const Move& move) {
 
 	const ChessPiece mover = bits.PieceFromIndex(to);
 
+	if ((mover & 7) == ChessPiece::King) {
+		friendlyKingSquare = from;
+	}
+
 	if (undoingCapture) {
 		uint8_t captureSquare = to;
 		if (undoingEnCapture) {
 			captureSquare = to + ((undoingBlackMove) ? 8 : -8);
+			enPassantSquare = captureSquare;
+		} else {
+			enPassantSquare = 255;
 		}
 
 		bits.enable(capturedPieceType, captureSquare);
 	}
 
 	if (move.isCastle()) {
+		// TODO: There is 100% an oversight here b/c iirc the king moving counts as a castle... so double check that the king
+		// TODO: is where they're supposed to be.
 		bool kingside = (to == PositionMasks::BlackKingsideMask) || (to == PositionMasks::WhiteKingsideMask);
 		const uint8_t originalRookSquare	= kingside ? to + 1 : to - 2;
 		const uint8_t movedRookSquare		= kingside ? to - 1 : to + 1;
 		ChessPiece rook = undoingBlackMove ? (ChessPiece)(Rook | Black) : Rook;
 		bits.enable(rook, originalRookSquare);
 		bits.disable(rook, movedRookSquare);
+
+		// TODO: it may be possible to regenerate castle rights programatically, but I'm doubtful b/c king could move
+		// TODO: start square, then back, then again, unmake would restore castle rights the second time.
+		// TODO: For now, going to store castle rights inside memory.
 	}
 
 	bits.disable(mover, to);
@@ -237,7 +254,11 @@ void GameState::UnmakeMove(const Move& move) {
 		bits.enable((ChessPiece)(Pawn | (!undoingBlackMove << 3)), from);
 	}
 
-	// TODO: currently, we aren't restoring flags associated with a previous state.
-	// I'm not really sure how best to go about this without lugging around a bunch
-	// of excess data. I'm not worrying about this right now, and will get to it later.
+	// Originally was using an internal stack to handle this, but was encountering some very strange bugs w/ popping causing
+	// crashes. May be worth investigating that eventually, but this is an acceptable solution for now.
+
+	capturedPieceType = memory.capturedPieceType;
+	castlingRights = memory.castlingRights;
+	halfClock = memory.halfClock;
+	clock -= undoingBlackMove ? 1 : 0;
 }

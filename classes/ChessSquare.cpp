@@ -30,7 +30,9 @@ void ChessSquare::setBit(Bit* abit) {
 	// consider a static_cast IF safe
 	ChessBit* bit = dynamic_cast<ChessBit*>(abit);
 	if (abit && bit == nullptr) { // abit exists but is not ChessBit
+#ifdef DEBUG
 		Loggy.log(Logger::ERROR, "ChessSquare::setBit -- abit must be type ChessBit!");
+#endif
 		throw std::invalid_argument("abit must be type ChessBit!");
 	}
 
@@ -44,10 +46,12 @@ void ChessSquare::initHolder(const ImVec2 &position, const char *spriteName, con
 	_row = row;
 	_posNotation = std::string(1, 'a' + column) + std::to_string(row + 1);
 	int odd = (column + row) % 2;
-	ImVec4 color = odd ? ImVec4(0.93, 0.93, 0.84, 1.0) : ImVec4(0.48, 0.58, 0.36, 1.0);
+	ImVec4 color = odd ? ImVec4(0.93f, 0.93f, 0.84f, 1.0f) : ImVec4(0.48f, 0.58f, 0.36f, 1.0f);
 	BitHolder::initHolder(position, color, spriteName);
+	#ifdef DEBUG
 	Loggy.log("Holder created at: " + formatCords(column, row) 
 							+ " -- " + formatCords(position.x, position.y));
+	#endif
 	setSize(spriteSize, spriteSize);
 }
 
@@ -63,23 +67,17 @@ bool ChessSquare::canDropBitAtPoint(Bit *newbit, const ImVec2 &point) {
 }
 
 bool ChessSquare::dropBitAtPoint(Bit *newbit, const ImVec2 &point) {
-	ChessBit* nBit = dynamic_cast<ChessBit*>(newbit);
-	if (nBit == nullptr) {
-		Loggy.log(Logger::ERROR, "ChessSquare::dropBitAtPoint -- newbit must be type ChessBit!");
-		throw std::invalid_argument("newbit must be type ChessBit!");
-	}
-
 	if (bit() == nullptr) {
-		setBit(nBit);
-		nBit->setParent(this);
-		nBit->moveTo(getPosition());
+		setBit(newbit);
+		newbit->setParent(this);
+		newbit->moveTo(getPosition());
 		return true;
 	}
 	// we're taking a piece!
-	if ((bit()->gameTag() ^ nBit->gameTag()) >= 8) {
-		setBit(nBit);
-		nBit->setParent(this);
-		nBit->moveTo(getPosition());
+	if ((bit()->gameTag() ^ newbit->gameTag()) >= 8) {
+		setBit(newbit);
+		newbit->setParent(this);
+		newbit->moveTo(getPosition());
 		return true;
 	}
 	return false;
@@ -93,9 +91,9 @@ std::string ChessSquare::indexToPosNotation(uint8_t index) {
 
 void ChessSquare::setMoveHighlighted(bool highlighted) {
 	int odd = (_column + _row) % 2;
-	_color = odd ? ImVec4(0.93, 0.93, 0.84, 1.0) : ImVec4(0.48, 0.58, 0.36, 1.0);
+	_color = odd ? ImVec4(0.93f, 0.93f, 0.84f, 1.0f) : ImVec4(0.48f, 0.58f, 0.36f, 1.0f);
 	if (highlighted) {
-		_color = odd ? ImVec4(0.48, 0.58, 0.36, 1.0) : ImVec4(0.93, 0.93, 0.84, 1.0);
-		_color = Lerp(_color, ImVec4(0.75, 0.79, 0.30, 1.0), 0.75);
+		_color = odd ? ImVec4(0.48f, 0.58f, 0.36f, 1.0f) : ImVec4(0.93f, 0.93f, 0.84f, 1.0f);
+		_color = Lerp(_color, ImVec4(0.75f, 0.79f, 0.30f, 1.0f), 0.75f);
 	}
 }

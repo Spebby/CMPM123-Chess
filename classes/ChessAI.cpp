@@ -15,40 +15,46 @@ static std::map<ChessPiece, int> evaluateScores = {
     {Bishop, 230},
     {Rook, 400},
     {Queen, 900},
-    {King, 3000}
+    {King, 2000}
 };
 
 // Returns: positive value if AI wins, negative if human player wins, 0 for draw or undecided
-int ChessAI::evaluateBoard(const ProtoBoard& board) const {
+int ChessAI::evaluateBoard() {
 	int score = 0;
 	for (int i = 0; i < 12; i++) {
 		// To simplify my statements a bit, I'll be adding the passes
 		// after I calculate their score, so I can subtract if black and add if white.
-		ChessPiece piece = board.PieceFromIndex(i);
+		ChessPiece piece = ProtoBoard::PieceFromProtoIndex(i);
 		bool black = (piece & 8) != 0;
 		piece = (ChessPiece)(piece & 7);
 
-		// i love bitboards
-		int passScore = evaluateScores[piece] * popCount(board[i]);
-		forEachBit([&passScore, &board, &piece](uint8_t pos){
+		// Add up scores of each piece, ignoring position.
+		int passScore = evaluateScores[piece] * popCount(_board[i]);
+		forEachBit([&passScore, &piece, &black](uint8_t pos){
+			uint8_t truePos = pos;
+			if (black) {
+				truePos = pos ^ 56;
+				// flip
+			}
+
 			switch(piece) {
 				case Pawn:
-					passScore += pawnTable[pos];
+					passScore += pawnTable[truePos];
 					break;
 				case Knight:
-					passScore += knightTable[pos];
+					passScore += knightTable[truePos];
 					break;
 				case Bishop:
-					passScore += bishopTable[pos];
+					passScore += bishopTable[truePos];
 					break;
 				case Rook:
-					passScore += rookTable[pos];
+					passScore += rookTable[truePos];
 					break;
 				case Queen:
-					passScore += rookTable[pos];
+					passScore += queenTable[truePos];
 					break;
 			}
-		}, board[i]);
+		}, _board[i]);
 
 		score += black ? -passScore : passScore;
 	}
@@ -78,35 +84,112 @@ int Chess::evaluateBoard(const char* state) {
 }
 */
 
-// init like this : negamax(rootState, depth, -inf, +inf, 1)
-// player is the current player's number (AI or human)
-int ChessAI::negamax(ChessAI& state, const int depth, int alpha, int beta, const bool isBlack) {
-	// TODO: move this to GameState
-	int score = state.evaluateBoard(_board);
+#include "../tools/Logger.h"
 
-    if (depth == 0 || state._state.getHalfClock() == 50) {
-        return score;
+int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int beta) {
+    if (depth == 0) {
+		// TODO: return quiesce search instead
+        return Quiesce(alpha, beta);
     }
 
-	MoveTable moves = Chess::MoveGenerator(state._state, false);
-	int bestVal = -inf; // Negative "Infinity"
-	uint64_t bitboard = state._state.getFriendlyOccuupancyBoard();
-	while(bitboard) {
-		uint8_t index = bitScanForward(bitboard);
-        bitboard &= bitboard - 1;
+	// Todo: TranspositionTable optimisation would be nice.
 
-		for (const Move& move : moves[index]) {
+
+	MoveTable moves = Chess::MoveGenerator(_state, false);
+
+	/*
+	if (moves.size() == 0) {
+		if (InCheck()) {
+			int score =  - distFromRoot;
+			return score;
+		}
+
+		return 0;
+	}*/
+
+	int bestValue = -inf; // Negative "Infinity"
+	//uint64_t bitboard = isBlack ? _board.getWhiteOccupancyBoard() : _board.getBlackOccupancyBoard();
+
+	for (const auto& t : moves) {
+		const std::vector<Move> moveList = t.second;
+		#ifdef DEBUG
+		Loggy.log("Depth: " + std::to_string(depth) + " index: " + std::to_string(t.first));
+		#endif
+		for (const Move& move : moveList) {
 			// Make, Mo' Nega, Unmake, Prune.
-			_state + move;
-			bestVal = std::max(bestVal, -negamax(state, depth - 1, -beta, -alpha, !isBlack));
-			_state - move;
+			GameStateMemory memory = _state.makeMemoryState();
+			_state.MakeMove(move);
+			#ifdef DEBUG
+			uint64_t bit = logDebugInfo();
+			#endif
+			int score = -negamax(depth - 1, distFromRoot + 1, -beta, -alpha);
+			#ifdef DEBUG
+			Loggy.log(std::to_string(score));
+			#endif
+			_state.UnmakeMove(move, memory);
 
-			alpha = std::max(alpha, bestVal);
-			if (alpha >= beta) {
-				break;
+			if (score > bestValue) {
+				bestValue = score;
+				if (score > alpha) {
+					alpha = score;
+				}
+			}
+
+			if (score >= beta) {
+				return bestValue;
 			}
 		}
-	};
+	}
 
-	return bestVal;
+	return bestValue;
 }
+
+int ChessAI::Quiesce(int alpha, int beta) {
+	return evaluateBoard();
+	// TODO
+
+	/*
+	int stand_pat = evaluateBoard();
+	if (stand_pat >= beta) {
+		return beta;
+	}
+	if (alpha < stand_pat) {
+		alpha = stand_pat;
+	}
+
+	until (everyCaptureExmained) {
+		MakeMove();
+		score = -Quiesce(-beta, -alpha);
+		UnmakeMove();
+
+		if (score >= beta) {
+			return beta;
+		}
+		if (score > alpha) {
+			alpha = score;
+		}
+	}
+	return alpha;
+	*/
+}
+
+// Eventually add more neuanced draw detection like three fold repetition
+bool ChessAI::isDraw() const {
+	if (_state.getHalfClock() >= 50) {
+		return true;
+	}
+	
+	return false;
+};
+
+bool ChessAI::InCheck() const {
+	return false;
+}
+
+#ifdef DEBUG
+uint64_t ChessAI::logDebugInfo() const {
+	uint64_t bits = _board.getOccupancyBoard();
+	Loggy.log("Occupancy - " + std::to_string(bits) + " - isBlack: " + std::to_string(_state.isBlackTurn()));
+	return bits;
+}
+#endif

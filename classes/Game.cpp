@@ -83,7 +83,9 @@ void Game::startGame() {
 }
 
 void Game::endTurn() {
+#ifdef DEBUG
 	Loggy.log(Logger::INFO, "Turn end.");
+#endif
 	_gameOps.currentTurnNo++;
 	std::string startState = stateString();
 	Turn *turn = new Turn;
