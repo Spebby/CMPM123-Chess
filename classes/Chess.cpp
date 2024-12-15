@@ -82,8 +82,7 @@ void Chess::setUpBoard() {
 	}
 
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
-	//setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
-	setStateString("rnbqkbnr/pPpppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
+	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
     // setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");				// checkmate check
     // setStateString("5k2/8/8/3q4/8/8/5PPP/7K"); endTurn(); 						// debug checkmate, black checkmate in one
     // setStateString("6k1/1P3ppp/8/8/8/8/8/4K3");									// check pawn promotion

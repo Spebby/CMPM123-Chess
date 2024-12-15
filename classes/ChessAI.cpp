@@ -92,7 +92,11 @@ int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int bet
     if (depth == 0) {
 		// TODO: return quiesce search instead
 		// For now just calls evaluate board and returns that immediately.
-        return Quiesce(alpha, beta);
+
+		// TODO: previously, I was returning the worst possible move due to colouring evaluation wrong.
+		// there's probably other places in the code where there's similar bugs, but multiplying by
+		// colour fixed a lot of problems.
+        return player * Quiesce(alpha, beta);
     }
 
 	// Todo: TranspositionTable optimisation would be nice.
