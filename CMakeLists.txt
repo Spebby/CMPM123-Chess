@@ -89,6 +89,7 @@ else()
         classes/Game.cpp
         classes/Sprite.cpp
         classes/MoveGeneration.cpp
+        classes/ChessStrings.cpp
         classes/Chess.cpp
         ${MAIN_FILE}
         ${IMPL_FILE}

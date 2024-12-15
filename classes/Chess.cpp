@@ -25,15 +25,6 @@ Chess::~Chess() {
 	cleanupMagicBitboards();
 }
 
-const std::map<char, ChessPiece> pieceFromSymbol = {
-	{'p', ChessPiece::Pawn},
-	{'n', ChessPiece::Knight},
-	{'b', ChessPiece::Bishop},
-	{'r', ChessPiece::Rook},
-	{'q', ChessPiece::Queen},
-	{'k', ChessPiece::King}
-};
-
 const int spriteSize = 64;
 // make a chess piece for the player
 ChessBit* Chess::PieceForPlayer(const int playerNumber, ChessPiece piece) {
@@ -91,8 +82,8 @@ void Chess::setUpBoard() {
 	}
 
 	// Seems like a good idea to start the game using Fen notation, so I can easily try different states for testing.
-	setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
-	//setStateString("rnbqkb1r/pppppppp/7n/8/8/5N2/PPPPPPPP/RNBQKBR1 b Qq - 0 1");
+	//setStateString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
+	setStateString("rnbqkbnr/pPpppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");	// Standard setup
     // setStateString("r3k2r/pp2bpp1/2np3p/2p1p2K/P6q/1PP5/3P1n1P/8");				// checkmate check
     // setStateString("5k2/8/8/3q4/8/8/5PPP/7K"); endTurn(); 						// debug checkmate, black checkmate in one
     // setStateString("6k1/1P3ppp/8/8/8/8/8/4K3");									// check pawn promotion
@@ -139,28 +130,6 @@ bool Chess::canBitMoveFrom(Bit& bit, BitHolder& src) {
 	}
 	return canMove;
 }
-
-/**
-bool Chess::canBitMoveFrom(Bit& bit, BitHolder& src) {
-    ChessSquare& srcSquare = static_cast<ChessSquare&>(src);
-    bool canMove = false;
-    for (auto move : _moves) {
-        if (move.from == srcSquare.getSquareIndex()) {
-            canMove = true;
-            for (int y = 0; y < _gameOptions.rowY; y++) {
-                for (int x = 0; x < _gameOptions.rowX; x++) {
-                    ChessSquare& dstSquare = _grid[y][x];
-                    ;
-                    if (move.to == dstSquare.getSquareIndex()) {
-                        dstSquare.setMoveHighlighted(true);
-                    }
-                }
-            }
-        }
-    }
-    return canMove;
-}
- */
 
 // Is the piece allowed to move here?
 bool Chess::canBitMoveFromTo(Bit& bit, BitHolder& src, BitHolder& dst) {
@@ -270,7 +239,7 @@ void Chess::endTurn() {
 
 Player* Chess::checkForWinner() {
 	// check to see if either player has won
-	if (_currentMoves.size() == 0) {
+	if (_currentMoves.empty() && Chess::InCheck()) {
 		return getInactivePlayer();
 	}
 
@@ -279,206 +248,23 @@ Player* Chess::checkForWinner() {
 
 bool Chess::checkForDraw() {
 	// check to see if the board is full
+
+	// Stalemate
+	if (_currentMoves.empty() && !Chess::InCheck()) {
+		return true;
+	}
+
+	// 50 Move counter
+	if (currState.getHalfClock() == 50) {
+		return true;
+	}
+
+	// TODO: 3-fold-repetition
+
 	return false;
 }
 
-// state strings
-std::string Chess::initialStateString() {
-	return stateString();
-}
-
-// this still needs to be tied into imguis init and shutdown
-// we will read the state string and store it in each turn object
-std::string Chess::stateString() {
-	std::string s;
-	int emptyCount = 0;
-
-	int file = 7, rank = 0;
-	for (int i = 0; i < _gameOps.size; i++) {
-		char piece = _grid[file * 8 + rank].getPieceNotation();
-		rank++;
-
-		if (piece == '0') { // Empty square
-			emptyCount++;
-		} else {
-			if (emptyCount > 0) {
-				s += std::to_string(emptyCount); // Append the count of empty squares
-				emptyCount = 0; // Reset count
-			}
-			s += piece; // Append the piece notation
-		}
-		
-		// Handle row breaks for FEN notation
-		if ((i + 1) % 8 == 0) {
-			if (emptyCount > 0) {
-				s += std::to_string(emptyCount); // Append remaining empty squares at end of row
-				emptyCount = 0;
-			}
-			if (i != (_gameOps.size - 1)) {
-				s += '/'; // Add row separator
-				rank = 0;
-				file--;
-			}
-		}
-	}
-
-	s += getCurrentPlayer()->playerNumber() ? " b " : " w ";
-	std::string castlingRights;
-	{
-		uint8_t rights = currState.getCastlingRights();
-		if (rights != 0) {
-			if (rights & 0b1000) castlingRights += 'K';
-			if (rights & 0b0100) castlingRights += 'Q';
-			if (rights & 0b0010) castlingRights += 'k';
-			if (rights & 0b0001) castlingRights += 'q';
-		} else {
-			castlingRights += '-';
-		}
-	}
-	s += castlingRights;
-
-	{
-		uint8_t enP = currState.getEnPassantSquare();
-		if (enP < 64) {
-			s += ' ' + _grid[enP].getPositionNotation() + ' ';
-		} else {
-			s += " - ";
-		}
-	}
-
-	s += std::to_string((int)(currState.getHalfClock())) + ' ' + std::to_string((int)(currState.getClock()));
-
-	return s;
-}
-
-const uint8_t INVALID_POS = 255;
-
-// this still needs to be tied into imguis init and shutdown
-// when the program starts it will load the current game from the imgui ini file and set the game state to the last saved state
-// modified from Sebastian Lague's Coding Adventure on Chess. 2:37
-void Chess::setStateString(const std::string& fen) {
-	ProtoBoard board;
-	uint8_t wKingSquare = INVALID_POS;
-	uint8_t bKingSquare = INVALID_POS;
-
-	size_t i = 0;
-	{ int file = 7, rank = 0;
-	for (; i < fen.size(); i++) {
-		const char symbol = fen[i];
-		if (symbol == ' ') { // terminating when reaching turn indicator
-			break;
-		}
-
-		if (symbol == '/') {
-			rank = 0;
-			file--;
-		} else {
-			// this is for the gap syntax.
-			if (std::isdigit(symbol)) {
-				rank += symbol - '0';
-			} else { // there is a piece here
-				// b/c white is considered as "0" elsewhere in the code, it makes
-				// more sense to specifically check ifBlack, even if FEN has it the
-				// other way around.
-				if (symbol == 'K') {
-					wKingSquare = file * 8 + rank;
-				} else if (symbol == 'k') {
-					bKingSquare = file * 8 + rank;
-				}
-
-				int isBlack = !std::isupper(symbol);
-				ChessPiece piece = pieceFromSymbol.at(std::tolower(symbol));
-				_grid[file * 8 + rank].setBit(PieceForPlayer(isBlack, piece));
-				board.enable(piece, isBlack, file * 8 + rank);
-				rank++;
-			}
-		}
-	}}
-
-	i++;
-	if (i >= fen.size()) {
-		int castling = 15;
-		// if Kings are not in starting position, then disable that side's ability to castle.
-
-		if (wKingSquare == INVALID_POS || bKingSquare == INVALID_POS) {
-			throw std::runtime_error("Invalid FEN string. King is missing!");
-		}
-		
-		if (wKingSquare != WhiteKingStartMask) {
-			castling &= 3;
-		}
-		if (bKingSquare != BlackKingStartMask) {
-			castling &= 12;
-		}
-
-		_state.emplace(board, 0, castling, INVALID_POS, 0, 0, wKingSquare, bKingSquare);
-		return;
-	}
-
-	// extract the game state part of FEN
-	bool isBlack = (fen[i] == 'b');
-	i += 2;
-
-	bool specifiesRights;
-	uint8_t castling = 0;
-	while (i < fen.size() && fen[i] != ' ') {
-		switch (fen[i++]) {
-			case 'K': castling |= 1 << 3; specifiesRights = true; break;
-			case 'Q': castling |= 1 << 2; specifiesRights = true; break;
-			case 'k': castling |= 1 << 1; specifiesRights = true; break;
-			case 'q': castling |= 1; specifiesRights = true; break;
-			case '-': castling  = 0; specifiesRights = true; break;
-		}
-	}
-	i++;
-
-	if (!specifiesRights) {
-		castling = 15;
-	}
-
-	// if Kings are not in starting position, then disable that side's ability to castle.
-	if (wKingSquare != WhiteKingStartMask) {
-		castling &= 3;
-	}
-	if (bKingSquare != BlackKingStartMask) {
-		castling &= 12;
-	}
-
-	uint8_t enTarget = INVALID_POS;
-	if (fen[i] != '-') {
-		int col	= fen[i++] - 'a';
-		int row	= fen[i++] - '1';
-
-		// Combine both to form a unique 8-bit value (8 * row + column)
-		enTarget = (row << 3) | col;
-	}
-	i++;
-	
-	uint8_t  hClock = 0;
-	uint16_t fClock = 0;
-	while (std::isdigit(fen[++i])) { hClock = hClock * 10 + (fen[i] - '0'); }
-	while (std::isdigit(fen[++i])) { fClock = fClock * 10 + (fen[i] - '0'); }
-
-	_state.emplace(board, isBlack, castling, enTarget, hClock, fClock, wKingSquare, bKingSquare);
-
-	// TODO: analyse the fen string to make sure king enemy king is not in check.
-	// if it is, throw an error.
-}
-
 /**
- * TODO: Due to the rest of the infastructure for the player expecting a single, globally accessible move list,
- * TODO: I'll have to cache a MoveTable for use on Non-AI turns, so we can handle lighting things up.
- * (pretty sure I did this already)
- * 
- * TODO: After this, we'll want to rethink our approach to Negamax. For TicTacToe it made sense to store everything
- * TODO: in a TicTacToeAI struct, but Chess is too complicated for that... I'll have to rewatch some of Graeme's
- * TODO: lectures, or ask for help in the Discord.
- * (I did this but broken a bit)
- * 
- * TODO: Lastly, don't forget about the move generation errors that still persist. The King still thinks he's in check
- * TODO: if the knight is in the same row as him. I don't think it'll be hard to track this bug down, but this must be fixed.
- * TODO: thankfully, the test cases we have lying around should greatly speedup testing & bug fixing.
- * 
  * When doing threading, a thread-safe transposition table is neccesary
  * 
  * threefoldRepetitionList
@@ -500,16 +286,17 @@ void Chess::updateAI() {
 	#ifdef DEBUG
 	Loggy.log("Starting AI Occuancy: " + std::to_string(currState.getOccupancyBoard()));
 	#endif
+
+	// these values are inverted b/c creating the newstate will effectively the values anyways.
+	const int player = currState.isBlackTurn() ? 1 : -1;
 	for (const Move& move : _currentMoves) {
 		ChessAI newState = ChessAI(GameState(currState, move));
 		#ifdef DEBUG
-		uint64_t bit = newState.logDebugInfo();
+		//uint64_t bit = newState.logDebugInfo();
 		#endif
 		//newState.reserveMemoryStack(MAX_DEPTH);
-		int moveVal = -newState.negamax(MAX_DEPTH, 0, -inf, inf);
+		int moveVal = -newState.negamax(MAX_DEPTH, 0, -inf, inf, player);
 		
-		// Logger::getInstance().log(std::to_string(i) + " eval is " + std::to_string(moveVal));
-
 		if (moveVal > bestVal) {
 			bestMove = &move;
 			bestVal  = moveVal;
@@ -533,6 +320,7 @@ void Chess::updateAI() {
 		auto toPosition = toSquare.getPosition();
 
 		toSquare.dropBitAtPoint(fromBit, toPosition);
+		fromSquare.setBit(nullptr);
 		bitMovedFromTo(*fromSquare.bit(), fromSquare, toSquare);
 	}
 }

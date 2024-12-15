@@ -11,7 +11,7 @@ class ChessAI {
 
     // init like this : negamax(rootState, depth, -inf, +inf, 1)
     // player is the current player's number (AI or human)
-    int negamax(const int depth, const int distFromRoot, const int alpha, const int beta);
+    int negamax(const int depth, const int distFromRoot, int alpha, int beta, const int player);
     // TODO: Look into alternative negamaxes like C*
 
     int Quiesce(const int alpha, const int beta);
@@ -23,7 +23,6 @@ class ChessAI {
 
     private:
     bool isDraw() const;
-    bool InCheck() const;
 
     GameState& _state;
     ProtoBoard& _board;

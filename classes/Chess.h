@@ -8,6 +8,15 @@
 #include "GameState.h"
 #include "ChessPiece.h"
 
+const std::map<char, ChessPiece> pieceFromSymbol = {
+	{'p', ChessPiece::Pawn},
+	{'n', ChessPiece::Knight},
+	{'b', ChessPiece::Bishop},
+	{'r', ChessPiece::Rook},
+	{'q', ChessPiece::Queen},
+	{'k', ChessPiece::King}
+};
+
 // the main game class
 class Chess : public Game {
 public:
@@ -29,9 +38,9 @@ public:
 	void		bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
 
 	static std::vector<Move> MoveGenerator(GameState&, bool=false);
-	static bool isPinned(int);
-	static bool isMovingAlongRay(int, int, int);
-	static bool squareIsInCheckRay(int);
+	// This will only be correct if called after MoveGenerator is called.
+	static bool InCheck();
+	static void sortMovesByMVVLVA(ProtoBoard&, std::vector<Move>&);
 
 	void		stopGame() override;
 	BitHolder&	getHolderAt(const int x, const int y) override { return _grid[y * 8 + x]; }
@@ -59,6 +68,10 @@ private:
 	static void GenerateSlidingMoves(std::vector<Move>&, GameState&);
 	static inline void GenerateSlidingMovesHelper(std::vector<Move>&, const std::function<uint64_t(uint8_t, uint64_t)>&, const uint64_t&, const uint64_t&, const uint64_t&, const uint64_t&);
 	static void GenerateKingMoves(std::vector<Move>&, GameState&);
+
+	static bool isPinned(int);
+	static bool isMovingAlongRay(int, int, int);
+	static bool squareIsInCheckRay(int);
 
 	ChessSquare	_grid[64];
 	std::stack<GameState> _state;

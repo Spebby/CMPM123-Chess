@@ -88,16 +88,29 @@ int Chess::evaluateBoard(const char* state) {
 }
 */
 
-int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int beta) {
+int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int beta, const int player) {
     if (depth == 0) {
 		// TODO: return quiesce search instead
+		// For now just calls evaluate board and returns that immediately.
         return Quiesce(alpha, beta);
     }
 
 	// Todo: TranspositionTable optimisation would be nice.
-
-
 	std::vector<Move> moves = Chess::MoveGenerator(_state, false);
+
+	// if no moves
+	if (moves.empty()) {
+		#ifdef DEBUG
+		uint64_t bit = logDebugInfo();
+		#endif
+		// If in check, 'das bad
+		if (Chess::InCheck()) {
+			return -(3000 - distFromRoot);
+		}
+
+		// otherwise this is a stalemate
+		return 0;
+	}
 
 	/*
 	if (moves.size() == 0) {
@@ -114,19 +127,16 @@ int ChessAI::negamax(const int depth, const int distFromRoot, int alpha, int bet
 
 	for (const Move& move : moves) {
 		#ifdef DEBUG
-		Loggy.log("Depth: " + std::to_string(depth) + " index: " + std::to_string(t.first));
+		//Loggy.log("Depth: " + std::to_string(depth) + " index: " + std::to_string(move.getFrom()));
 		#endif
 
 		// Make, Mo' Nega, Unmake, Prune.
 		GameStateMemory memory = _state.makeMemoryState();
 		_state.MakeMove(move);
 		#ifdef DEBUG
-		uint64_t bit = logDebugInfo();
+		//uint64_t bit = logDebugInfo();
 		#endif
-		int score = std::max(bestValue, -negamax(depth - 1, distFromRoot + 1, -beta, -alpha));
-		#ifdef DEBUG
-		Loggy.log(std::to_string(score));
-		#endif
+		bestValue = std::max(bestValue, -negamax(depth - 1, distFromRoot + 1, -beta, -alpha, -player));
 		_state.UnmakeMove(move, memory);
 
 		alpha = std::max(bestValue, alpha);
@@ -174,10 +184,6 @@ bool ChessAI::isDraw() const {
 		return true;
 	}
 	
-	return false;
-};
-
-bool ChessAI::InCheck() const {
 	return false;
 }
 

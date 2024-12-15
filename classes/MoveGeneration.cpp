@@ -32,6 +32,10 @@ inline void ReInitGen() {
 	pinRayBitmask = 0U;
 }
 
+bool Chess::InCheck() {
+	return inCheck;
+}
+
 std::vector<Move> Chess::MoveGenerator(GameState& state, bool capturesOnly) {
 	// this isn't optimised the best; in the future we'll want to use bitboards instead.
 	generateQuiets = !capturesOnly;
@@ -58,6 +62,24 @@ std::vector<Move> Chess::MoveGenerator(GameState& state, bool capturesOnly) {
 
 	return list;
 }
+
+/*
+// thanks for the starter, graeme
+void Chess::sortMovesByMVVLVA(ProtoBoard& board, std::vector<Move>& captureMoves) {
+    if (captureMoves.size() < 2) return;
+
+    // Implement sorting of moves based on the MVV-LVA heuristic
+    // https://www.chessprogramming.org/MVV-LVA
+    // https://www.chessprogramming.org/Move_Ordering
+    std::sort(captureMoves.begin(), captureMoves.end(), [&](const Move& a, const Move& b) {
+					evaluateScores();
+                    int victimValueA = Evaluate::getPieceValue(state[a.to]);
+                    int attackerValueA = Evaluate::getPieceValue(state[a.from]);
+                    int victimValueB = Evaluate::getPieceValue(state[b.to]);
+                    int attackerValueB = Evaluate::getPieceValue(state[b.from]);
+                    return (victimValueA - attackerValueA) > (victimValueB - attackerValueB); });
+}
+*/
 
 inline int getDirectionOffset(int a, int b) {
     // Convert linear index a and b to (row, col)
@@ -101,9 +123,11 @@ void Chess::CalculateAttackData(GameState& state) {
 	// update sliding attack lanes
 	uint64_t occupancy = state.getOccupancyBoard();
 	uint64_t sliderBoard;
+	// index of King Square on bitboard.
+	const uint64_t kingBit = 1ULL << friendlyKingSquare;
 
 	{
-		uint64_t blockers = occupancy ^ (1ULL << friendlyKingSquare);
+		uint64_t blockers = occupancy ^ kingBit;
 		uint64_t rooks = state.getPieceOccupancyBoard(ChessPiece::Rook, blackIsEnemy);
 		sliderBoard |= rooks;
 		forEachBit([&](uint8_t square) {
@@ -201,7 +225,7 @@ void Chess::CalculateAttackData(GameState& state) {
 		uint64_t attacks = KnightAttacks[fromSquare];
 		knightAttackMap |= attacks;
 		// if knight is attacking king, update doubleCheck status.
-		if (!isKnightCheck && ((knightAttackMap & (1ULL << friendlyKingSquare)) != 0)) {
+		if (!isKnightCheck && ((knightAttackMap & kingBit) != 0)) {
 			isKnightCheck = true;
 			doubleCheck = inCheck;
 			inCheck = true;
@@ -219,7 +243,7 @@ void Chess::CalculateAttackData(GameState& state) {
 		uint64_t attacks = PawnAttacks[fromSquare][blackIsEnemy];
 		pawnAttackMap |= attacks;
 
-		if (!pawnCheck && (pawnAttackMap & friendlyKingSquare) != 0) {
+		if (!pawnCheck && (pawnAttackMap & kingBit) != 0) {
 			pawnCheck = true;
 			doubleCheck = inCheck;
 			inCheck = true;
@@ -267,8 +291,13 @@ inline void Chess::GeneratePawnPush(std::vector<Move>& moves, GameState& state, 
 			}
 		} else {
 			moves.emplace_back(fromSquare, toSquare);
-			toSquare += moveDir;
 			bool canDPush = state.isBlackTurn() ? ((fromSquare / 8) == BlackPawnStartRank) : ((fromSquare / 8) == WhitePawnStartRank);
+			if (!canDPush) return;
+
+			toSquare += moveDir;
+			// there is for sure a cleaner way of doing this, but for the moment we run this check twice so
+			// we don't get a situation where we can make this move, even though it doesn't block check.
+			if (inCheck && !squareIsInCheckRay(toSquare)) return;
 			if (canDPush && ((occupancy & (1ULL << toSquare)) == 0)) {
 				moves.emplace_back(fromSquare, toSquare, Move::FlagCodes::DoublePush);
 			}
@@ -286,7 +315,7 @@ inline void Chess::GeneratePawnAttack(std::vector<Move>& moves, GameState& state
 		// if enpassant square is specified, then we know it's a legal move b/c en passant square is set on previous turn.
 
 		// promote captures combos
-		bool canPromote = toSquare == (state.isBlackTurn() ? (fromSquare % 8) : (fromSquare % 8) + 56);
+		bool canPromote = toSquare == (state.isBlackTurn() ? (toSquare % 8) : (toSquare % 8) + 56);
 		if (canPromote) {
 			for (int i = 0; i < 4; i++) {
 				moves.emplace_back(fromSquare, toSquare, Move::FlagCodes::ToQueen << i);

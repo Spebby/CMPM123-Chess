@@ -50,6 +50,8 @@ GameState::GameState(const GameState& old, const Move& move)
 	// is making their move.
 	if ((piece & 7) == ChessPiece::King) {
 		enemyKingSquare = to;
+	} else if ((piece & 7) == ChessPiece::Pawn) {
+		halfClock = 0;
 	}
 
 	if (to == old.enPassantSquare) {
@@ -134,9 +136,6 @@ void GameState::MakeMove(const Move& move) {
 	castlingRights = castlingRights & ~((move.KingSideCastle()  ? (isBlack ? 0b1000 : 0b0010) : 0) | (move.QueenSideCastle() ? (isBlack ? 0b0100 : 0b0001) : 0));
 	halfClock++;
 	!isBlack ? clock++ : 0;
-	uint8_t temp = friendlyKingSquare;
-	friendlyKingSquare = enemyKingSquare;
-	enemyKingSquare = temp;
 	capturedPieceType = NoPiece;
 
 	uint8_t from = move.getFrom();
@@ -148,7 +147,14 @@ void GameState::MakeMove(const Move& move) {
 
 	if ((piece & 7) == ChessPiece::King) {
 		friendlyKingSquare = to;
+	} else if ((piece & 7) == ChessPiece::Pawn) {
+		halfClock = 0;
 	}
+
+	// Swapping King pos after King moves so we don't accidentally overwrite the wrong king position.
+	uint8_t temp = friendlyKingSquare;
+	friendlyKingSquare = enemyKingSquare;
+	enemyKingSquare = temp;
 
 	// not updated enPassantSquare yet so still "old" move.
 	if (to == enPassantSquare) {
@@ -201,6 +207,7 @@ void GameState::MakeMove(const Move& move) {
 	enPassantSquare = move.isDoublePush() ? (move.getTo() + (isBlack ? -8 : 8)) : 255;
 }
 
+#include <cassert>
 void GameState::UnmakeMove(const Move& move, const GameStateMemory& memory) {
 	uint8_t temp = friendlyKingSquare;
 	friendlyKingSquare = enemyKingSquare;
@@ -264,4 +271,6 @@ void GameState::UnmakeMove(const Move& move, const GameStateMemory& memory) {
 	castlingRights = memory.castlingRights;
 	halfClock = memory.halfClock;
 	clock -= undoingBlackMove ? 1 : 0;
+
+	//assert(friendlyKingSquare != 11);
 }
