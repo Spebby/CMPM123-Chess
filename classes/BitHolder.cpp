@@ -1,6 +1,9 @@
 #include "BitHolder.h"
 #include "Bit.h"
+
+#ifdef DEBUG
 #include "../tools/Logger.h"
+#endif
 
 BitHolder::~BitHolder() {
 
@@ -18,6 +21,8 @@ Bit* BitHolder::bit() {
 	return _bit;
 }
 
+// TODO: eventually I'll have to go back and rework this framework code since me messing with it has caused
+// things to break. Eventually revert it back to Graeme's original version or slowly move it back towards that.
 void BitHolder::setBit(Bit* abit) {
 	if (abit != (void *)bit()) {
 		destroyBit();
@@ -26,7 +31,9 @@ void BitHolder::setBit(Bit* abit) {
 			_bit->setParent(this);
 			_bit->setPosition(this->getPosition());
 			int tag = abit->gameTag();
-			Loggy.log(std::to_string((tag & 8) >> 3) + " placed " + std::to_string(tag & 7) + " at (" + std::to_string(abit->getPosition().x) + ", " + std::to_string(abit->getPosition().y) + ")");
+			#ifdef DEBUG
+			//Loggy.log(std::to_string((tag & 8) >> 3) + " placed " + std::to_string(tag & 7) + " at (" + std::to_string(abit->getPosition().x) + ", " + std::to_string(abit->getPosition().y) + ")");
+			#endif
 		}
 	}
 }
