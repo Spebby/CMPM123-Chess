@@ -5,6 +5,10 @@
 ## 🎯 Project Overview
 A very rudamentry Chess program (and eventually, AI) based on Graeme Devine's [skeleton code](https://github.com/Spebby/CMPM123-Chess/commits/95c448471543cbf7a933316e770efa8766cd0943/), given a graphical interface with [Dear ImGui](https://github.com/ocornut/imgui/tree/docking). This is the final project for the CMPM-123's Fall '24 Quarter at the University of California, Santa Cruz.
 
+You can view previous phases of this project by checking out the associated branches.
+
+[Part 1](https://github.com/Spebby/CMPM123-Chess/tree/Part-1) -- [Part 2](https://github.com/Spebby/CMPM123-Chess/tree/Part-2) -- [Part 3](https://github.com/Spebby/CMPM123-Chess/tree/Part-3)
+
 ### 🎓 Educational Purpose
 This project serves as a teaching tool for computer science students to understand:
 - Game state representation
