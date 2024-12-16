@@ -12,7 +12,7 @@
 
 #define currState _state.top()
 
-const int MAX_DEPTH = 3;
+const int MAX_DEPTH = 5;
 
 Chess::Chess() {
 	initMagicBitboards();
@@ -92,8 +92,7 @@ void Chess::setUpBoard() {
     // setStateString("5k2/2R5/8/3Q3p/3p4/3P1K2/4P3/8");							// white can checkmate
     // setStateString("r1bn3r/pp3ppp/5k2/q1pP4/2N5/P1QB4/1Q3PPP/R3K2R");			// didn't see check
     // setStateString("r3k1r1/pp1N1ppp/2n1pq2/1B6/3QP3/8/P2Q1PPP/R3K2R");			// didn't see check
-	// setStateString("k7/8/8/8/2Q5/8/3K4/2r5"); // Rook Check Sanity Check
-	// setStateString("k7/8/8/8/2Q5/8/3K4/2b5"); // Bishop Check Sanity Check
+	// setStateString("k7/8/8/8/8/8/PPPPPPPP/R3K2R w KQ - 0 1");  // W King can castle
 
 	// Great website for generating test cases
 	// http://www.netreal.de/Forsyth-Edwards-Notation/index.php
@@ -151,31 +150,33 @@ void Chess::bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) {
 	ChessSquare& dstSquare = static_cast<ChessSquare&>(dst);
 
 	// get the move being played
-	const uint8_t i = srcSquare.getIndex();
-	const uint8_t j = dstSquare.getIndex();
+	const uint8_t from = srcSquare.getIndex();
+	const uint8_t to = dstSquare.getIndex();
 
 	// this line currently garauntees that we'll auto turn into a queen b/c queen promotion option is always pushed first.
 	// eventually when I make a gui for it, we'll need to revise this to handle there being multiple "moves" for a single position.
-	Move* move = MoveForPositions(i, j);
-
-	if (!move) {
-		throw std::runtime_error("Illegal Move attempted ft: " + std::to_string(i) + " " + std::to_string(j));
+	Move* temp = MoveForPositions(from, to);
+	if (!temp) {
+		throw std::runtime_error("Illegal Move attempted ft: " + std::to_string(from) + " " + std::to_string(to));
 	}
 
+	Move move = *temp;
+
 	// EnPassant Check
-	if (currState.getEnPassantSquare() == j && ((bit.gameTag() & 7) == ChessPiece::Pawn)) {
-		_grid[j + (currState.isBlackTurn() ? 8 : -8)].destroyBit();
+	if (currState.getEnPassantSquare() == to && ((bit.gameTag() & 7) == ChessPiece::Pawn)) {
+		_grid[to + (currState.isBlackTurn() ? 8 : -8)].destroyBit();
 		// increment score.
-	} else if (move->isCastle() && ((bit.gameTag() & 7) == ChessPiece::King)) { // castle
+	} else if (move.isCastle() && ((bit.gameTag() & 7) == ChessPiece::King)) { // castle
 		uint8_t offset = currState.isBlackTurn() ? 56 : 0;
-		uint8_t rookSpot = (move->QueenSideCastle() ? 0 : 7) + offset;
-		uint8_t targ = (move->QueenSideCastle() ? 3 : 5) + offset;
-		_grid[targ].setBit(_grid[rookSpot].bit());
-		_grid[rookSpot].setBit(nullptr);
-	} else if (move->isPromotion()) {
+		uint8_t originalRookSquare = (move.QueenSideCastle() ? 0 : 7) + offset;
+		uint8_t movedRookSquare    = (move.QueenSideCastle() ? 3 : 5) + offset;
+
+		_grid[movedRookSquare].setBit(_grid[originalRookSquare].bit());
+		_grid[originalRookSquare].setBit(nullptr);
+	} else if (move.isPromotion()) {
 		// todo, but for the moment b/c of how our move is selected, queen will be only "move" we can make.
 		int newPiece = 0;
-		switch(move->getFlags() & Move::FlagCodes::Promotion) {
+		switch(move.getFlags() & Move::FlagCodes::Promotion) {
 			case Move::FlagCodes::ToQueen:
 				newPiece = ChessPiece::Queen;
 				break;
@@ -195,7 +196,7 @@ void Chess::bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) {
 	}
 
 	// check if we took a rook
-	_state.emplace(currState, *move);
+	_state.emplace(currState, move);
 
 	// do some check to prompt the UI to select a promotion.
 
@@ -320,7 +321,7 @@ void Chess::updateAI() {
 
 		toSquare.dropBitAtPoint(fromBit, toPosition);
 		fromSquare.setBit(nullptr);
-		bitMovedFromTo(*fromSquare.bit(), fromSquare, toSquare);
+		bitMovedFromTo(*fromBit, fromSquare, toSquare);
 	}
 }
 

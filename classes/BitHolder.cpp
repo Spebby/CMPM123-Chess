@@ -21,6 +21,8 @@ Bit* BitHolder::bit() {
 	return _bit;
 }
 
+// TODO: eventually I'll have to go back and rework this framework code since me messing with it has caused
+// things to break. Eventually revert it back to Graeme's original version or slowly move it back towards that.
 void BitHolder::setBit(Bit* abit) {
 	if (abit != (void *)bit()) {
 		destroyBit();

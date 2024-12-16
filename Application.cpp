@@ -185,7 +185,11 @@ namespace ClassGame {
 
 		if (gameOver) {
 			ImGui::Text("\nGame Over!");
-			ImGui::Text("Winner: %d", gameWinner);
+			if (gameWinner != -1) {
+				ImGui::Text("Winner: %d", gameWinner);
+			} else {
+				ImGui::Text("Stalemate!");
+			}
 			if (ImGui::Button("Reset Game")) {
 				game->stopGame();
 				game->setUpBoard();

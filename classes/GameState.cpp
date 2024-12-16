@@ -50,6 +50,18 @@ GameState::GameState(const GameState& old, const Move& move)
 	// is making their move.
 	if ((piece & 7) == ChessPiece::King) {
 		enemyKingSquare = to;
+		castlingRights &= !isBlack ? ~0b0011 : ~0b1100;
+
+		if (move.isCastle()) {
+			const uint8_t offset = !isBlack ? 56 : 0;
+			const uint8_t originalRookSquare = (move.QueenSideCastle() ? 0 : 7) + offset;
+			const uint8_t movedRookSquare    = (move.QueenSideCastle() ? 3 : 5) + offset;
+
+			const ChessPiece lookup = (ChessPiece)(ChessPiece::Rook | (!isBlack << 3));
+
+			bits.enable(lookup, movedRookSquare);
+			bits.disable(lookup, originalRookSquare);
+		}
 	} else if ((piece & 7) == ChessPiece::Pawn) {
 		halfClock = 0;
 	}
@@ -70,15 +82,11 @@ GameState::GameState(const GameState& old, const Move& move)
 		} else if (to == 63 || to == 7) {
 			castlingRights &= isBlackTurn() ? ~0b0010 : ~0b1000;
 		}
-	} else if (move.isCastle()) {
-		uint8_t offset = isBlack ? 56 : 0;
-		uint8_t rookSpot = move.QueenSideCastle() ? 0 : 7 + offset;
-		uint8_t targ = (move.QueenSideCastle() ? 3 : 5) + offset;
-
-		ChessPiece lookup = (ChessPiece)(ChessPiece::Rook | (isBlack << 3));
-
-		bits.enable(lookup, rookSpot);
-		bits.disable(lookup, rookSpot);
+	
+	// TODO: at some point i was a dumbass and never put checks here to make sure king couldn't trigger castling
+	// by simply moving his ass to the destination square, which summons a rook for him???
+	// regardless... make sure to properly put checks here. Also consider changing when move.isCastle() can be true
+	// perhaps it would make sense to no longer mark every single king move as a castle (duh)
 	} else if (move.isPromotion()) {
 		ChessPiece newPiece;
 		switch(move.getFlags() & Move::FlagCodes::Promotion) {
@@ -147,6 +155,18 @@ void GameState::MakeMove(const Move& move) {
 
 	if ((piece & 7) == ChessPiece::King) {
 		friendlyKingSquare = to;
+		castlingRights &= !isBlack ? ~0b0011 : ~0b1100;
+
+		if (move.isCastle()) {
+			const uint8_t offset = !isBlack ? 56 : 0;
+			const uint8_t originalRookSquare = (move.QueenSideCastle() ? 0 : 7) + offset;
+			const uint8_t movedRookSquare    = (move.QueenSideCastle() ? 3 : 5) + offset;
+
+			const ChessPiece lookup = (ChessPiece)(ChessPiece::Rook | (!isBlack << 3));
+
+			bits.enable(lookup, movedRookSquare);
+			bits.disable(lookup, originalRookSquare);
+		}
 	} else if ((piece & 7) == ChessPiece::Pawn) {
 		halfClock = 0;
 	}
@@ -172,15 +192,6 @@ void GameState::MakeMove(const Move& move) {
 		} else if (to == 63 || to == 7) {
 			castlingRights &= isBlackTurn() ? ~0b0010 : ~0b1000;
 		}
-	} else if (move.isCastle()) {
-		uint8_t offset = isBlack ? 56 : 0;
-		uint8_t rookSpot = move.QueenSideCastle() ? 0 : 7 + offset;
-		uint8_t targ = (move.QueenSideCastle() ? 3 : 5) + offset;
-
-		ChessPiece lookup = (ChessPiece)(ChessPiece::Rook | (isBlack << 3));
-
-		bits.enable(lookup, rookSpot);
-		bits.disable(lookup, rookSpot);
 	} else if (move.isPromotion()) {
 		ChessPiece newPiece;
 		switch(move.getFlags() & Move::FlagCodes::Promotion) {
@@ -229,6 +240,15 @@ void GameState::UnmakeMove(const Move& move, const GameStateMemory& memory) {
 
 	if ((mover & 7) == ChessPiece::King) {
 		friendlyKingSquare = from;
+		if (move.isCastle()) {
+			const uint8_t offset = undoingBlackMove ? 56 : 0;
+			const uint8_t originalRookSquare = (move.QueenSideCastle() ? 0 : 7) + offset;
+			const uint8_t movedRookSquare    = (move.QueenSideCastle() ? 3 : 5) + offset;
+
+			const ChessPiece rook = undoingBlackMove ? (ChessPiece)(Rook | Black) : Rook;
+			bits.enable(rook, originalRookSquare);
+			bits.disable(rook, movedRookSquare);
+		}
 	}
 
 	if (undoingCapture) {
@@ -241,21 +261,6 @@ void GameState::UnmakeMove(const Move& move, const GameStateMemory& memory) {
 		}
 
 		bits.enable(capturedPieceType, captureSquare);
-	}
-
-	if (move.isCastle()) {
-		// TODO: There is 100% an oversight here b/c iirc the king moving counts as a castle... so double check that the king
-		// TODO: is where they're supposed to be.
-		bool kingside = (to == PositionMasks::BlackKingsideMask) || (to == PositionMasks::WhiteKingsideMask);
-		const uint8_t originalRookSquare	= kingside ? to + 1 : to - 2;
-		const uint8_t movedRookSquare		= kingside ? to - 1 : to + 1;
-		ChessPiece rook = undoingBlackMove ? (ChessPiece)(Rook | Black) : Rook;
-		bits.enable(rook, originalRookSquare);
-		bits.disable(rook, movedRookSquare);
-
-		// TODO: it may be possible to regenerate castle rights programatically, but I'm doubtful b/c king could move
-		// TODO: start square, then back, then again, unmake would restore castle rights the second time.
-		// TODO: For now, going to store castle rights inside memory.
 	}
 
 	bits.disable(mover, to);

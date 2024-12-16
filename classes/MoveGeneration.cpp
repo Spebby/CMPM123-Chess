@@ -399,7 +399,6 @@ void Chess::GenerateKingMoves(std::vector<Move>& moves, GameState& state) {
 
 	forEachBit([&](uint8_t toSquare) {
 		bool capture = (enemies & (1ULL << toSquare));
-		uint16_t flags = Move::FlagCodes::Castling;
 
 		// If this is not a capture...
 		if (!capture) {
@@ -412,7 +411,7 @@ void Chess::GenerateKingMoves(std::vector<Move>& moves, GameState& state) {
 
 		// This space is safe for the king to move to
 		if (!(attackMap & (1ULL << toSquare))) {
-			moves.emplace_back(friendlyKingSquare, toSquare, flags);
+			moves.emplace_back(friendlyKingSquare, toSquare);
 		}
 	}, attacks);
 
@@ -427,16 +426,17 @@ void Chess::GenerateKingMoves(std::vector<Move>& moves, GameState& state) {
 		if (canCastleKingSide) {
 			const uint64_t mask = state.isBlackTurn() ? PositionMasks::BlackKingsideMask : PositionMasks::WhiteKingsideMask;
 			if ((mask & blockers) == 0) {
-				const uint8_t castleSquare = friendlyKingSquare + 1;
-				moves.emplace_back(friendlyKingSquare, castleSquare, Move::FlagCodes::Castling);
+				const uint8_t castleSquare = friendlyKingSquare + 2;
+				moves.emplace_back(friendlyKingSquare, castleSquare, Move::FlagCodes::KCastle);
 			}
+		}
 		// QueenSide, d1, d8
-		} else if (canCastleQueenSide) {
+		if (canCastleQueenSide) {
 			const uint64_t mask      = state.isBlackTurn() ? PositionMasks::BlackQueensideMask      : PositionMasks::WhiteQueensideMask;
-			const uint64_t blockMask = state.isBlackTurn() ? PositionMasks::BlackQueensideBlockMask : PositionMasks::WhiteQueensideBlockMask;
-			if (((mask & blockers) == 0) && ((blockMask & occupancy) == 0)) {
+			//const uint64_t blockMask = state.isBlackTurn() ? PositionMasks::BlackQueensideBlockMask : PositionMasks::WhiteQueensideBlockMask;
+			if (((mask & blockers) == 0)) {
 				const uint8_t castleSquare = friendlyKingSquare - 2;
-				moves.emplace_back(friendlyKingSquare, castleSquare, Move::FlagCodes::Castling);
+				moves.emplace_back(friendlyKingSquare, castleSquare, Move::FlagCodes::QCastle);
 			}
 		}
 	}
