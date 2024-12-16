@@ -3,9 +3,9 @@
 ![Chess Board](./BoardScreenshot.png)
 
 ## 🎯 Project Overview
-A very rudamentry Chess engine based on Graeme Devine's [skeleton code](https://github.com/Spebby/CMPM123-Chess/commits/95c448471543cbf7a933316e770efa8766cd0943/), given a graphical interface with [Dear ImGui](https://github.com/ocornut/imgui/tree/docking). This is the final project for the CMPM-123's Fall '24 Quarter at the University of California, Santa Cruz.
+A very rudamentry chess engine based on Graeme Devine's [skeleton code](https://github.com/Spebby/CMPM123-Chess/commits/95c448471543cbf7a933316e770efa8766cd0943/), given a graphical interface with [Dear ImGui](https://github.com/ocornut/imgui/tree/docking). This is the final project for the CMPM-123's Fall '24 Quarter at the University of California, Santa Cruz.
 
-You can view previous phases of this project by checking out the associated branches.
+You can view previous phases of this project by checking out the associated branches, or downloading the respective releases!
 
 [Part 1](https://github.com/Spebby/CMPM123-Chess/tree/Part-1) -- [Part 2](https://github.com/Spebby/CMPM123-Chess/tree/Part-2) -- [Part 3](https://github.com/Spebby/CMPM123-Chess/tree/Part-3)
 
@@ -176,7 +176,7 @@ Like many other AI's, this AI is based on the Negamax algorithm and utalises Alp
 
 ### Phase 1: Board Setup
 - Piece placement
-- Setup initial board state
+- Initial board state
 - Validate board representation
 
 ### Phase 2: Move Generation
